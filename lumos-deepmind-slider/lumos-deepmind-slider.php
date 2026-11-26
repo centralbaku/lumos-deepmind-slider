@@ -3,14 +3,14 @@
  * Plugin Name: Lumos DeepMind Hero Slider
  * Plugin URI: https://deepmind.google/models/gemini-robotics/
  * Description: Pixel-perfect, responsive hero carousel for WordPress inspired by Google DeepMind Gemini Robotics. Supports video and image slide backgrounds, customizable scrim overlay, hero top-center and card top-left placements, touch/swipe gestures, and WordPress Media Library integration.
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: Lumos & DeepMind
  * Author URI: https://deepmind.google/
  * Text Domain: lumos-deepmind-slider
  * Domain Path: /languages
  * Requires at least: 5.6
  * Requires PHP: 7.4
- * Update URI: false
+ * Update URI: https://github.com/centralbaku/lumos-deepmind-slider
  *
  * @package LumosDeepMindSlider
  */
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'LUMOS_SLIDER_VERSION', '1.0.1' );
+define( 'LUMOS_SLIDER_VERSION', '1.1.0' );
 define( 'LUMOS_SLIDER_FILE', __FILE__ );
 define( 'LUMOS_SLIDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'LUMOS_SLIDER_URL', plugin_dir_url( __FILE__ ) );
@@ -30,6 +30,8 @@ require_once LUMOS_SLIDER_PATH . 'includes/class-slider-defaults.php';
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-shortcode.php';
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-admin.php';
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-block.php';
+require_once LUMOS_SLIDER_PATH . 'includes/class-slider-updater.php';
+Lumos_Slider_Updater::init( __FILE__, LUMOS_SLIDER_VERSION );
 
 /**
  * Main plugin singleton class

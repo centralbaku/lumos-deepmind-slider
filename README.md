@@ -228,3 +228,17 @@ if ( function_exists( 'lumos_deepmind_slider' ) ) {
 }
 ?>
 ```
+
+## Updates (WordPress)
+
+Sites check this repo's latest GitHub Release every 6 hours and show the normal **"Update available"**
+notice under Plugins (or right away via Dashboard → Updates → **Check again**).
+
+To publish a new version from your Mac: commit your changes, then
+
+```bash
+scripts/release.sh 1.2.0 "What changed"
+```
+
+GitHub Actions lints the PHP, checks the tag matches the plugin version, builds
+`lumos-deepmind-slider-v1.2.0.zip` and attaches it to the release.

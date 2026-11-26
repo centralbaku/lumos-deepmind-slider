@@ -1,0 +1,42 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Lint PHP
+        run: find lumos-deepmind-slider -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Check tag matches plugin version
+        run: |
+          F=lumos-deepmind-slider/lumos-deepmind-slider.php
+          TAG="${GITHUB_REF_NAME#v}"
+          HDR=$(grep -m1 -E '^\s*\*\s*Version:' $F | awk '{print $NF}')
+          CONST=$(grep -m1 "define( 'LUMOS_SLIDER_VERSION'" $F | sed -E "s/.*'([^']+)' \).*/\1/")
+          echo "tag=$TAG header=$HDR const=$CONST"
+          [ "$TAG" = "$HDR" ] && [ "$TAG" = "$CONST" ] || { echo "Version mismatch"; exit 1; }
+
+      - name: Build zip
+        run: |
+          find lumos-deepmind-slider -name '.DS_Store' -delete
+          zip -qr "lumos-deepmind-slider-${GITHUB_REF_NAME}.zip" lumos-deepmind-slider
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: "Lumos DeepMind Hero Slider ${{ github.ref_name }}"
+          files: lumos-deepmind-slider-${{ github.ref_name }}.zip
+          generate_release_notes: true
