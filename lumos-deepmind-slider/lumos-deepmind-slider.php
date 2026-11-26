@@ -26,6 +26,9 @@ define( 'LUMOS_SLIDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'LUMOS_SLIDER_URL', plugin_dir_url( __FILE__ ) );
 
 // Load classes.
+// Shared LUMOS admin menu (identical copy ships in every Lumos plugin)
+require_once LUMOS_SLIDER_PATH . 'includes/lumos-menu.php';
+
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-defaults.php';
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-shortcode.php';
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-admin.php';

@@ -38,60 +38,27 @@ class Lumos_Slider_Admin {
 	 * Register admin menu items
 	 */
 	public function register_admin_menus() {
-		add_menu_page(
-			__( 'DeepMind Slider', 'lumos-deepmind-slider' ),
-			__( 'DeepMind Slider', 'lumos-deepmind-slider' ),
-			'manage_options',
+		// Listed as "Slider" under the shared LUMOS menu. The other screens are reached
+		// through the tabs on the slider page and keep "Slider" highlighted.
+		lumos_menu_add_product(
 			'lumos-deepmind-slider',
+			__( 'Slider', 'lumos-deepmind-slider' ),
 			array( $this, 'render_slides_page' ),
-			'dashicons-slides',
-			30
+			__( 'Full-screen hero slider with a block and shortcode.', 'lumos-deepmind-slider' ),
+			'manage_options',
+			'dashicons-slides'
 		);
 
-		add_submenu_page(
-			'lumos-deepmind-slider',
-			__( 'Manage Slides', 'lumos-deepmind-slider' ),
-			__( 'Manage Slides', 'lumos-deepmind-slider' ),
-			'manage_options',
-			'lumos-deepmind-slider',
-			array( $this, 'render_slides_page' )
+		$hidden = array(
+			'lumos-slider-settings'      => array( __( 'Settings & Shortcode', 'lumos-deepmind-slider' ), 'render_settings_page' ),
+			'lumos-slider-media-guide'   => array( __( 'Media Guidelines', 'lumos-deepmind-slider' ), 'render_media_guide_page' ),
+			'lumos-slider-changelog'     => array( __( 'Changelog', 'lumos-deepmind-slider' ), 'render_changelog_page' ),
+			'lumos-slider-import-export' => array( __( 'Import & Export', 'lumos-deepmind-slider' ), 'render_import_export_page' ),
 		);
 
-		add_submenu_page(
-			'lumos-deepmind-slider',
-			__( 'Settings & Shortcode', 'lumos-deepmind-slider' ),
-			__( 'Settings & Shortcode', 'lumos-deepmind-slider' ),
-			'manage_options',
-			'lumos-slider-settings',
-			array( $this, 'render_settings_page' )
-		);
-
-		add_submenu_page(
-			'lumos-deepmind-slider',
-			__( 'Media Guidelines', 'lumos-deepmind-slider' ),
-			__( 'Media Guidelines', 'lumos-deepmind-slider' ),
-			'manage_options',
-			'lumos-slider-media-guide',
-			array( $this, 'render_media_guide_page' )
-		);
-
-		add_submenu_page(
-			'lumos-deepmind-slider',
-			__( 'Changelog', 'lumos-deepmind-slider' ),
-			__( 'Changelog', 'lumos-deepmind-slider' ),
-			'manage_options',
-			'lumos-slider-changelog',
-			array( $this, 'render_changelog_page' )
-		);
-
-		add_submenu_page(
-			'lumos-deepmind-slider',
-			__( 'Import & Export', 'lumos-deepmind-slider' ),
-			__( 'Import & Export', 'lumos-deepmind-slider' ),
-			'manage_options',
-			'lumos-slider-import-export',
-			array( $this, 'render_import_export_page' )
-		);
+		foreach ( $hidden as $slug => $page ) {
+			lumos_menu_add_hidden_page( $slug, $page[0], array( $this, $page[1] ), 'lumos-deepmind-slider' );
+		}
 	}
 
 	/**
