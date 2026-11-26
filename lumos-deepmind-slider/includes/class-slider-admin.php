@@ -826,7 +826,7 @@ class Lumos_Slider_Admin {
 		}
 		$current['loop']                 = ! empty( $_POST['loop'] );
 		$current['advance_on_video_end'] = ! empty( $_POST['advance_on_video_end'] );
-		$current['slide_height']         = isset( $_POST['slide_height'] ) ? sanitize_text_field( wp_unslash( $_POST['slide_height'] ) ) : 'clamp(520px, 82svh, 800px)';
+		$current['slide_height']         = isset( $_POST['slide_height'] ) ? $this->sanitize_css_length( wp_unslash( $_POST['slide_height'] ), 'clamp(520px, 82svh, 800px)' ) : 'clamp(520px, 82svh, 800px)';
 
 		update_option( 'lumos_slider_settings', $current );
 	}
@@ -1143,20 +1143,22 @@ class Lumos_Slider_Admin {
 		$new_data = $this->sanitize_slide_data( wp_unslash( $_POST ) );
 
 		if ( 'new' === $slide_id || empty( $slide_id ) ) {
-			$new_data['id'] = time();
+			$new_data['id'] = $this->generate_slide_id( $slides );
 			$slides[]       = $new_data;
 		} else {
 			$found = false;
 			foreach ( $slides as $key => $slide ) {
 				if ( (string) $slide['id'] === (string) $slide_id ) {
 					$new_data['id'] = $slide['id'];
-					$slides[ $key ] = $new_data;
-					$found          = true;
+					// The edit form does not post the on/off state; keep the stored value.
+					$new_data['active'] = isset( $slide['active'] ) ? (bool) $slide['active'] : true;
+					$slides[ $key ]     = $new_data;
+					$found              = true;
 					break;
 				}
 			}
 			if ( ! $found ) {
-				$new_data['id'] = time();
+				$new_data['id'] = $this->generate_slide_id( $slides );
 				$slides[]       = $new_data;
 			}
 		}
@@ -1234,7 +1236,7 @@ class Lumos_Slider_Admin {
 			$new_slides[] = $s;
 			if ( (string) $s['id'] === (string) $slide_id ) {
 				$cloned          = $s;
-				$cloned['id']    = time();
+				$cloned['id']    = $this->generate_slide_id( $slides );
 				$cloned['title'] = $s['title'] . ' (Copy)';
 				$new_slides[]    = $cloned;
 			}
@@ -1295,6 +1297,41 @@ class Lumos_Slider_Admin {
 	}
 
 	/**
+	 * Generate a slide ID that is unique within the given slides list.
+	 *
+	 * @param array $slides Existing slides.
+	 * @return string
+	 */
+	private function generate_slide_id( $slides ) {
+		$used = array();
+		foreach ( (array) $slides as $slide ) {
+			if ( is_array( $slide ) && isset( $slide['id'] ) ) {
+				$used[ (string) $slide['id'] ] = true;
+			}
+		}
+		$id = (int) round( microtime( true ) * 1000 );
+		while ( isset( $used[ (string) $id ] ) ) {
+			$id++;
+		}
+		return (string) $id;
+	}
+
+	/**
+	 * Accept only a safe CSS length expression (e.g. "clamp(520px, 82svh, 800px)").
+	 *
+	 * @param mixed  $value   Raw value.
+	 * @param string $default Fallback value.
+	 * @return string
+	 */
+	public function sanitize_css_length( $value, $default ) {
+		$value = trim( sanitize_text_field( (string) $value ) );
+		if ( '' !== $value && preg_match( '/^[0-9a-z().%\s,+\-*\/]{1,120}$/i', $value ) ) {
+			return $value;
+		}
+		return $default;
+	}
+
+	/**
 	 * Helper: Sanitize slide data array
 	 *
 	 * @param array $data Raw slide input data.
@@ -1323,7 +1360,7 @@ class Lumos_Slider_Admin {
 		$logo_alt      = isset( $data['logo_alt'] ) ? sanitize_text_field( $data['logo_alt'] ) : '';
 
 		return array(
-			'id'              => isset( $data['id'] ) ? sanitize_text_field( $data['id'] ) : time(),
+			'id'              => isset( $data['id'] ) && '' !== (string) $data['id'] ? sanitize_text_field( $data['id'] ) : $this->generate_slide_id( array() ),
 			'active'          => ! isset( $data['active'] ) || true === $data['active'] || '1' === $data['active'] || 1 === $data['active'],
 			'title'           => isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '',
 			'title_tag'       => isset( $data['title_tag'] ) ? sanitize_text_field( $data['title_tag'] ) : 'h2',
@@ -1353,33 +1390,6 @@ class Lumos_Slider_Admin {
 			'logo_position'   => $logo_position,
 			'logo_alt'        => $logo_alt,
 		);
-	}
-
-	/**
-	 * Helper: Recursively delete a directory
-	 *
-	 * @param string $dir Path to directory.
-	 */
-	private function recursive_delete_dir( $dir ) {
-		if ( ! is_dir( $dir ) ) {
-			return;
-		}
-		$items = scandir( $dir );
-		if ( false === $items ) {
-			return;
-		}
-		foreach ( $items as $item ) {
-			if ( '.' === $item || '..' === $item ) {
-				continue;
-			}
-			$path = $dir . DIRECTORY_SEPARATOR . $item;
-			if ( is_dir( $path ) ) {
-				$this->recursive_delete_dir( $path );
-			} else {
-				@unlink( $path );
-			}
-		}
-		@rmdir( $dir );
 	}
 
 	/**
@@ -1567,7 +1577,7 @@ class Lumos_Slider_Admin {
 	}
 
 	/**
-	 * Export Slides: Generates downloadable ZIP archive with slides.json + media/ or standalone JSON
+	 * Export Slides: ZIP archive (slides.json + media/) or standalone JSON backup.
 	 */
 	public function handle_export_slides() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -1580,7 +1590,7 @@ class Lumos_Slider_Admin {
 		$settings = get_option( 'lumos_slider_settings', Lumos_Slider_Defaults::get_default_settings() );
 		$format   = isset( $_GET['format'] ) && 'json' === $_GET['format'] ? 'json' : 'zip';
 
-		// JSON format export
+		// JSON format export (no media files bundled).
 		if ( 'json' === $format ) {
 			$data = array(
 				'generator'   => 'Lumos DeepMind Hero Slider',
@@ -1600,25 +1610,32 @@ class Lumos_Slider_Admin {
 			exit;
 		}
 
-		// ZIP format export with media
+		// ZIP format export with media.
 		if ( ! class_exists( 'ZipArchive' ) ) {
 			wp_die( esc_html__( 'The ZipArchive PHP extension is not available on this server. Please contact your host or export as JSON instead.', 'lumos-deepmind-slider' ) );
 		}
 
-		$upload_dir = wp_upload_dir();
-		$temp_zip   = trailingslashit( $upload_dir['basedir'] ) . 'lumos-export-' . uniqid() . '.zip';
-
-		$zip = new ZipArchive();
+		// Build the archive in the system temp directory (never in the public uploads folder).
+		$temp_zip = wp_tempnam( 'lumos-export.zip' );
+		$zip      = new ZipArchive();
 		if ( true !== $zip->open( $temp_zip, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
 			wp_die( esc_html__( 'Failed to create export ZIP archive.', 'lumos-deepmind-slider' ) );
 		}
 
+		$upload_dir       = wp_upload_dir();
 		$media_map        = array();
 		$used_names       = array();
 		$processed_slides = array();
+		$temp_downloads   = array();
+
+		$media_keys = array( 'video', 'video_webm', 'poster', 'image', 'logo' );
 
 		foreach ( $slides as $slide_idx => $slide ) {
-			$processed_slide = $slide;
+			if ( ! is_array( $slide ) ) {
+				continue;
+			}
+
+			$processed_slide                   = $slide;
 			$processed_slide['_bundled_media'] = array();
 
 			$media_fields = array(
@@ -1629,97 +1646,50 @@ class Lumos_Slider_Admin {
 				'logo'       => isset( $slide['logo_url'] ) ? $slide['logo_url'] : '',
 			);
 
-			foreach ( $media_fields as $field_key => $url ) {
-				$url = trim( $url );
-				if ( empty( $url ) ) {
+			foreach ( $media_keys as $field_key ) {
+				$url = trim( (string) $media_fields[ $field_key ] );
+				if ( '' === $url ) {
 					continue;
 				}
 
+				// Root-relative URLs are made absolute so they can be resolved.
+				if ( 0 === strpos( $url, '/' ) && 0 !== strpos( $url, '//' ) ) {
+					$url = home_url( $url );
+				}
+
 				$clean_url = strtok( $url, '#' );
+				if ( ! preg_match( '#^https?://#i', $clean_url ) ) {
+					continue;
+				}
 
 				if ( isset( $media_map[ $clean_url ] ) ) {
 					$processed_slide['_bundled_media'][ $field_key ] = $media_map[ $clean_url ];
 					continue;
 				}
 
-				$file_path = '';
-				$file_data = null;
-
-				// 1. Try resolving via attachment ID
-				$post_id = attachment_url_to_postid( $clean_url );
-				if ( $post_id ) {
-					$attached = get_attached_file( $post_id );
-					if ( $attached && file_exists( $attached ) ) {
-						$file_path = $attached;
+				$source = $this->locate_local_media( $clean_url, $upload_dir );
+				if ( null === $source ) {
+					$source = $this->download_media( $clean_url );
+					if ( null === $source ) {
+						continue;
 					}
+					$temp_downloads[] = $source;
 				}
 
-				// 2. Try resolving via upload baseurl
-				if ( ! $file_path && 0 === strpos( $clean_url, $upload_dir['baseurl'] ) ) {
-					$rel = str_replace( $upload_dir['baseurl'], '', $clean_url );
-					$candidate = $upload_dir['basedir'] . $rel;
-					if ( file_exists( $candidate ) ) {
-						$file_path = $candidate;
-					}
-				}
+				$filename          = $this->unique_media_name( $clean_url, $field_key, $slide_idx, $used_names );
+				$zip_relative_path = 'media/' . $filename;
 
-				// 3. Try resolving via ABSPATH
-				if ( ! $file_path && 0 === strpos( $clean_url, home_url() ) ) {
-					$rel = str_replace( home_url(), '', $clean_url );
-					$candidate = ABSPATH . ltrim( $rel, '/' );
-					if ( file_exists( $candidate ) ) {
-						$file_path = $candidate;
-					}
-				}
-
-				// 4. Download remote file if not local
-				if ( ! $file_path ) {
-					$response = wp_safe_remote_get(
-						$clean_url,
-						array(
-							'timeout'   => 25,
-							'sslverify' => false,
-						)
-					);
-					if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
-						$file_data = wp_remote_retrieve_body( $response );
-					}
-				}
-
-				if ( ! $file_path && null === $file_data ) {
+				if ( ! $zip->addFile( $source, $zip_relative_path ) ) {
 					continue;
 				}
 
-				// Generate clean unique filename inside media/
-				$parsed_path  = parse_url( $clean_url, PHP_URL_PATH );
-				$raw_filename = $parsed_path ? basename( $parsed_path ) : 'media_' . $slide_idx . '_' . $field_key;
-				$filename     = sanitize_file_name( $raw_filename );
-				if ( empty( $filename ) || false === strpos( $filename, '.' ) ) {
-					$ext      = ( 'video' === $field_key || 'video_webm' === $field_key ) ? ( 'video_webm' === $field_key ? '.webm' : '.mp4' ) : '.jpg';
-					$filename = 'media_' . $slide_idx . '_' . $field_key . $ext;
-				}
-
-				if ( isset( $used_names[ $filename ] ) ) {
-					$filename = ( $slide_idx + 1 ) . '_' . $filename;
-				}
-				$used_names[ $filename ] = true;
-
-				$zip_relative_path = 'media/' . $filename;
-
-				if ( $file_path && file_exists( $file_path ) ) {
-					$zip->addFile( $file_path, $zip_relative_path );
-				} elseif ( null !== $file_data ) {
-					$zip->addFromString( $zip_relative_path, $file_data );
-				}
-
-				$media_map[ $clean_url ] = $zip_relative_path;
+				$media_map[ $clean_url ]                         = $zip_relative_path;
 				$processed_slide['_bundled_media'][ $field_key ] = $zip_relative_path;
 			}
 
 			$processed_slides[] = $processed_slide;
 		}
 
-		// Bundle slides.json manifest
 		$manifest = array(
 			'generator'   => 'Lumos DeepMind Hero Slider',
 			'version'     => LUMOS_SLIDER_VERSION,
@@ -1733,11 +1703,17 @@ class Lumos_Slider_Admin {
 		$zip->addFromString( 'slides.json', wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		$zip->close();
 
-		if ( ! file_exists( $temp_zip ) ) {
+		// Downloaded temp files can only be removed after the archive is closed.
+		foreach ( $temp_downloads as $tmp_file ) {
+			@unlink( $tmp_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		}
+
+		if ( ! file_exists( $temp_zip ) || 0 === filesize( $temp_zip ) ) {
+			@unlink( $temp_zip ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			wp_die( esc_html__( 'Error: Zip export file could not be generated.', 'lumos-deepmind-slider' ) );
 		}
 
-		$download_name = 'lumos-slides-export-' . gmdate( 'Y-m-d' ) . '.zip';
+		$download_name = 'lumos-slides-export-' . gmdate( 'Y-m-d-His' ) . '.zip';
 		header( 'Content-Description: File Transfer' );
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="' . $download_name . '"' );
@@ -1746,13 +1722,122 @@ class Lumos_Slider_Admin {
 		header( 'Cache-Control: must-revalidate, post-check=0, pre-check=0' );
 		header( 'Pragma: public' );
 		header( 'Content-Length: ' . filesize( $temp_zip ) );
-		readfile( $temp_zip );
-		@unlink( $temp_zip );
+		readfile( $temp_zip ); // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
+		@unlink( $temp_zip ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 		exit;
 	}
 
 	/**
-	 * AJAX: Import Slides and Sideload Media into WP Media Library
+	 * Find a media file that already lives on this site.
+	 *
+	 * @param string $url        Absolute media URL.
+	 * @param array  $upload_dir wp_upload_dir() result.
+	 * @return string|null Absolute local path or null.
+	 */
+	private function locate_local_media( $url, $upload_dir ) {
+		$post_id = attachment_url_to_postid( $url );
+		if ( $post_id ) {
+			$attached = get_attached_file( $post_id );
+			if ( $attached && is_file( $attached ) ) {
+				return $attached;
+			}
+		}
+
+		$path = (string) wp_parse_url( $url, PHP_URL_PATH );
+
+		if ( 0 === strpos( $url, $upload_dir['baseurl'] ) ) {
+			$candidate = $upload_dir['basedir'] . substr( rawurldecode( $path ), strlen( (string) wp_parse_url( $upload_dir['baseurl'], PHP_URL_PATH ) ) );
+			if ( $this->is_inside( $candidate, $upload_dir['basedir'] ) ) {
+				return $candidate;
+			}
+		}
+
+		if ( 0 === strpos( $url, home_url() ) ) {
+			$candidate = ABSPATH . ltrim( rawurldecode( substr( $path, strlen( (string) wp_parse_url( home_url(), PHP_URL_PATH ) ) ) ), '/' );
+			if ( $this->is_inside( $candidate, ABSPATH ) ) {
+				return $candidate;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether a path resolves to a real file inside a base directory.
+	 *
+	 * @param string $path Candidate path.
+	 * @param string $base Base directory.
+	 * @return bool
+	 */
+	private function is_inside( $path, $base ) {
+		$real_path = realpath( $path );
+		$real_base = realpath( $base );
+		return $real_path && $real_base && is_file( $real_path ) && 0 === strpos( $real_path, rtrim( $real_base, '/\\' ) . DIRECTORY_SEPARATOR );
+	}
+
+	/**
+	 * Download a remote media file to a temp file (streamed, not held in memory).
+	 *
+	 * @param string $url Remote URL.
+	 * @return string|null Temp file path or null on failure.
+	 */
+	private function download_media( $url ) {
+		$tmp      = wp_tempnam( 'lumos-media' );
+		$response = wp_safe_remote_get(
+			$url,
+			array(
+				'timeout'   => 60,
+				'sslverify' => true,
+				'stream'    => true,
+				'filename'  => $tmp,
+			)
+		);
+
+		if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) || ! file_exists( $tmp ) || 0 === filesize( $tmp ) || filesize( $tmp ) > wp_max_upload_size() ) {
+			@unlink( $tmp ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			return null;
+		}
+
+		return $tmp;
+	}
+
+	/**
+	 * Build a unique, safe file name for a media entry inside the ZIP.
+	 *
+	 * @param string $url        Media URL.
+	 * @param string $field_key  Field key (video, poster, ...).
+	 * @param int    $slide_idx  Slide index.
+	 * @param array  $used_names Names already used (lowercase keys), passed by reference.
+	 * @return string
+	 */
+	private function unique_media_name( $url, $field_key, $slide_idx, &$used_names ) {
+		$path = (string) wp_parse_url( $url, PHP_URL_PATH );
+		$name = $path ? sanitize_file_name( rawurldecode( basename( $path ) ) ) : '';
+
+		if ( '' === $name || false === strpos( $name, '.' ) ) {
+			if ( 'video_webm' === $field_key ) {
+				$ext = '.webm';
+			} elseif ( 'video' === $field_key ) {
+				$ext = '.mp4';
+			} else {
+				$ext = '.jpg';
+			}
+			$name = 'media_' . $slide_idx . '_' . $field_key . $ext;
+		}
+
+		$candidate = $name;
+		$counter   = 1;
+		while ( isset( $used_names[ strtolower( $candidate ) ] ) ) {
+			$candidate = $counter . '_' . $name;
+			$counter++;
+		}
+
+		$used_names[ strtolower( $candidate ) ] = true;
+		return $candidate;
+	}
+
+	/**
+	 * AJAX: Import (restore) a backup and sideload its media into the Media Library.
 	 */
 	public function ajax_import_slides() {
 		check_ajax_referer( 'lumos_slider_admin_nonce', 'nonce' );
@@ -1761,187 +1846,136 @@ class Lumos_Slider_Admin {
 			wp_send_json_error( __( 'Permission denied.', 'lumos-deepmind-slider' ) );
 		}
 
-		if ( empty( $_FILES['import_file'] ) || UPLOAD_ERR_OK !== $_FILES['import_file']['error'] ) {
+		if ( empty( $_FILES['import_file'] ) || ! is_array( $_FILES['import_file'] ) ) {
 			wp_send_json_error( __( 'Please select a valid export file (.zip or .json) to upload.', 'lumos-deepmind-slider' ) );
 		}
 
-		$file_info       = $_FILES['import_file'];
-		$file_name       = sanitize_file_name( $file_info['name'] );
-		$file_ext        = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
-		$import_mode     = isset( $_POST['import_mode'] ) && 'append' === $_POST['import_mode'] ? 'append' : 'replace';
-		$import_settings = ! empty( $_POST['import_settings'] );
+		$file = $_FILES['import_file']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		if ( UPLOAD_ERR_OK !== (int) $file['error'] ) {
+			wp_send_json_error( $this->upload_error_message( (int) $file['error'] ) );
+		}
 
+		$tmp_path = isset( $file['tmp_name'] ) ? $file['tmp_name'] : '';
+		if ( '' === $tmp_path || ! is_uploaded_file( $tmp_path ) ) {
+			wp_send_json_error( __( 'The uploaded file could not be read.', 'lumos-deepmind-slider' ) );
+		}
+
+		$file_name = sanitize_file_name( (string) $file['name'] );
+		$file_ext  = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
 		if ( ! in_array( $file_ext, array( 'zip', 'json' ), true ) ) {
 			wp_send_json_error( __( 'Invalid file format. Only .zip and .json backup files are supported.', 'lumos-deepmind-slider' ) );
 		}
 
-		$slides_data          = null;
-		$settings_data        = null;
+		$import_mode     = isset( $_POST['import_mode'] ) && 'append' === $_POST['import_mode'] ? 'append' : 'replace'; // phpcs:ignore WordPress.Security.NonceVerification
+		$import_settings = ! empty( $_POST['import_settings'] ); // phpcs:ignore WordPress.Security.NonceVerification
+
+		try {
+			$result = $this->run_import( $tmp_path, $file_ext, $import_mode, $import_settings );
+		} catch ( RuntimeException $e ) {
+			wp_send_json_error( $e->getMessage() );
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * Perform a backup import. Separated from the AJAX layer so it can be tested.
+	 *
+	 * @param string $tmp_path        Path to the uploaded (or test) backup file.
+	 * @param string $file_ext        'zip' or 'json'.
+	 * @param string $import_mode     'replace' or 'append'.
+	 * @param bool   $import_settings Whether to restore the saved settings too.
+	 * @return array Result summary.
+	 * @throws RuntimeException When the backup is invalid. Nothing is changed in that case.
+	 */
+	public function run_import( $tmp_path, $file_ext, $import_mode, $import_settings ) {
+		$package = 'json' === $file_ext ? $this->read_json_backup( $tmp_path ) : $this->open_zip_backup( $tmp_path );
+
+		// Sideload media (ZIP only), then remap slide media URLs to the new Media Library files.
+		$media_url_map        = array();
 		$media_imported_count = 0;
+		$media_skipped        = 0;
+		if ( ! empty( $package['zip'] ) ) {
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			require_once ABSPATH . 'wp-admin/includes/media.php';
 
-		if ( 'json' === $file_ext ) {
-			$json_content = file_get_contents( $file_info['tmp_name'] );
-			$decoded      = json_decode( $json_content, true );
-			if ( empty( $decoded ) || ! is_array( $decoded ) || empty( $decoded['slides'] ) ) {
-				wp_send_json_error( __( 'Invalid JSON file: No slides data found in backup.', 'lumos-deepmind-slider' ) );
-			}
-			$slides_data   = $decoded['slides'];
-			$settings_data = isset( $decoded['settings'] ) && is_array( $decoded['settings'] ) ? $decoded['settings'] : null;
-		} else {
-			if ( ! class_exists( 'ZipArchive' ) ) {
-				wp_send_json_error( __( 'ZipArchive PHP extension is not available on this server.', 'lumos-deepmind-slider' ) );
-			}
-
-			$upload_dir       = wp_upload_dir();
-			$temp_extract_dir = trailingslashit( $upload_dir['basedir'] ) . 'lumos-import-' . uniqid();
-			wp_mkdir_p( $temp_extract_dir );
-
-			$zip = new ZipArchive();
-			if ( true !== $zip->open( $file_info['tmp_name'] ) ) {
-				$this->recursive_delete_dir( $temp_extract_dir );
-				wp_send_json_error( __( 'Failed to open the uploaded ZIP archive.', 'lumos-deepmind-slider' ) );
-			}
-
-			$zip->extractTo( $temp_extract_dir );
-			$zip->close();
-
-			// Locate slides.json
-			$json_path = $temp_extract_dir . '/slides.json';
-			if ( ! file_exists( $json_path ) ) {
-				$subdirs = glob( $temp_extract_dir . '/*/slides.json' );
-				if ( ! empty( $subdirs ) ) {
-					$json_path = $subdirs[0];
-				}
-			}
-
-			if ( ! file_exists( $json_path ) ) {
-				$this->recursive_delete_dir( $temp_extract_dir );
-				wp_send_json_error( __( 'Invalid backup: slides.json was not found in the ZIP archive.', 'lumos-deepmind-slider' ) );
-			}
-
-			$json_content = file_get_contents( $json_path );
-			$decoded      = json_decode( $json_content, true );
-			if ( empty( $decoded ) || ! is_array( $decoded ) || empty( $decoded['slides'] ) ) {
-				$this->recursive_delete_dir( $temp_extract_dir );
-				wp_send_json_error( __( 'No slide records found inside slides.json.', 'lumos-deepmind-slider' ) );
-			}
-
-			$slides_data   = $decoded['slides'];
-			$settings_data = isset( $decoded['settings'] ) && is_array( $decoded['settings'] ) ? $decoded['settings'] : null;
-
-			// Sideload media into Media Library
-			$base_dir      = dirname( $json_path );
-			$media_dir     = $base_dir . '/media';
-			$media_url_map = array();
-
-			if ( is_dir( $media_dir ) ) {
-				require_once ABSPATH . 'wp-admin/includes/image.php';
-				require_once ABSPATH . 'wp-admin/includes/file.php';
-				require_once ABSPATH . 'wp-admin/includes/media.php';
-
-				$media_files = scandir( $media_dir );
-				if ( false !== $media_files ) {
-					foreach ( $media_files as $mf ) {
-						if ( '.' === $mf || '..' === $mf || '.DS_Store' === $mf ) {
-							continue;
-						}
-						$file_path = $media_dir . '/' . $mf;
-						if ( ! is_file( $file_path ) ) {
-							continue;
-						}
-
-						$file_contents = file_get_contents( $file_path );
-						if ( false === $file_contents ) {
-							continue;
-						}
-
-						// Sideload via wp_upload_bits
-						$upload = wp_upload_bits( $mf, null, $file_contents );
-						if ( ! empty( $upload['error'] ) ) {
-							continue;
-						}
-
-						$wp_filetype = wp_check_filetype( $upload['file'] );
-						$attachment  = array(
-							'post_mime_type' => $wp_filetype['type'],
-							'post_title'     => sanitize_file_name( pathinfo( $mf, PATHINFO_FILENAME ) ),
-							'post_content'   => '',
-							'post_status'    => 'inherit',
-						);
-						$attach_id = wp_insert_attachment( $attachment, $upload['file'] );
-						if ( ! is_wp_error( $attach_id ) && $attach_id > 0 ) {
-							$attach_data = wp_generate_attachment_metadata( $attach_id, $upload['file'] );
-							wp_update_attachment_metadata( $attach_id, $attach_data );
-						}
-
-						$new_url = $upload['url'];
-						$media_url_map[ 'media/' . $mf ] = $new_url;
-						$media_url_map[ $mf ]            = $new_url;
-						$media_imported_count++;
-					}
-				}
-			}
-
-			// Remap media URLs in slides
-			foreach ( $slides_data as &$s ) {
-				if ( isset( $s['_bundled_media'] ) && is_array( $s['_bundled_media'] ) ) {
-					if ( ! empty( $s['_bundled_media']['video'] ) && isset( $media_url_map[ $s['_bundled_media']['video'] ] ) ) {
-						$s['video_url'] = $media_url_map[ $s['_bundled_media']['video'] ];
-					}
-					if ( ! empty( $s['_bundled_media']['video_webm'] ) && isset( $media_url_map[ $s['_bundled_media']['video_webm'] ] ) ) {
-						$s['video_webm_url'] = $media_url_map[ $s['_bundled_media']['video_webm'] ];
-					}
-					if ( ! empty( $s['_bundled_media']['poster'] ) && isset( $media_url_map[ $s['_bundled_media']['poster'] ] ) ) {
-						$s['poster_url'] = $media_url_map[ $s['_bundled_media']['poster'] ];
-					}
-					if ( ! empty( $s['_bundled_media']['image'] ) && isset( $media_url_map[ $s['_bundled_media']['image'] ] ) ) {
-						$s['image_url'] = $media_url_map[ $s['_bundled_media']['image'] ];
-					}
-					if ( ! empty( $s['_bundled_media']['logo'] ) && isset( $media_url_map[ $s['_bundled_media']['logo'] ] ) ) {
-						$s['logo_url'] = $media_url_map[ $s['_bundled_media']['logo'] ];
-					}
-				} else {
-					$url_keys = array( 'video_url', 'video_webm_url', 'poster_url', 'image_url', 'logo_url' );
-					foreach ( $url_keys as $uk ) {
-						if ( ! empty( $s[ $uk ] ) ) {
-							$base = basename( parse_url( $s[ $uk ], PHP_URL_PATH ) );
-							if ( isset( $media_url_map[ $base ] ) ) {
-								$s[ $uk ] = $media_url_map[ $base ];
-							}
-						}
-					}
-				}
-				unset( $s['_bundled_media'] );
-			}
-			unset( $s );
-
-			// Cleanup temporary extract directory
-			$this->recursive_delete_dir( $temp_extract_dir );
+			$media_url_map        = $this->sideload_media( $package['zip'], $package['media'], $media_imported_count );
+			$package['zip']->close();
 		}
 
-		// Sanitize all imported slides
+		$slides_data = array();
+		foreach ( $package['slides'] as $raw_slide ) {
+			if ( ! is_array( $raw_slide ) ) {
+				continue;
+			}
+			if ( isset( $raw_slide['_bundled_media'] ) && is_array( $raw_slide['_bundled_media'] ) ) {
+				foreach ( array( 'video' => 'video_url', 'video_webm' => 'video_webm_url', 'poster' => 'poster_url', 'image' => 'image_url', 'logo' => 'logo_url' ) as $key => $field ) {
+					$bundled = isset( $raw_slide['_bundled_media'][ $key ] ) ? (string) $raw_slide['_bundled_media'][ $key ] : '';
+					if ( '' === $bundled ) {
+						continue;
+					}
+					if ( isset( $media_url_map[ $bundled ] ) ) {
+						$raw_slide[ $field ] = $media_url_map[ $bundled ];
+					} else {
+						// The file was in the backup but could not be restored: never keep a URL
+						// that points at the old site.
+						$raw_slide[ $field ] = '';
+						$media_skipped++;
+					}
+				}
+			} else {
+				foreach ( array( 'video_url', 'video_webm_url', 'poster_url', 'image_url', 'logo_url' ) as $field ) {
+					if ( ! empty( $raw_slide[ $field ] ) ) {
+						$base = basename( (string) wp_parse_url( $raw_slide[ $field ], PHP_URL_PATH ) );
+						if ( isset( $media_url_map[ 'media/' . $base ] ) ) {
+							$raw_slide[ $field ] = $media_url_map[ 'media/' . $base ];
+						}
+					}
+				}
+			}
+			unset( $raw_slide['_bundled_media'] );
+			$slides_data[] = $raw_slide;
+		}
+
+		// Sanitize everything before touching stored options.
 		$sanitized_slides = array();
-		$time_base        = time();
-		foreach ( $slides_data as $i => $raw_slide ) {
-			$sanitized = $this->sanitize_slide_data( $raw_slide );
-			if ( 'append' === $import_mode ) {
-				$sanitized['id'] = $time_base + ( $i * 10 );
-			}
-			$sanitized_slides[] = $sanitized;
+		foreach ( $slides_data as $raw_slide ) {
+			$sanitized_slides[] = $this->sanitize_slide_data( $raw_slide );
 		}
 
-		// Update slides in options
+		if ( empty( $sanitized_slides ) ) {
+			throw new RuntimeException( __( 'No valid slide records were found in the backup. Nothing was changed.', 'lumos-deepmind-slider' ) );
+		}
+
+		$existing_slides = get_option( 'lumos_slider_slides', Lumos_Slider_Defaults::get_default_slides() );
+		if ( ! is_array( $existing_slides ) ) {
+			$existing_slides = array();
+		}
+
+		// Give every imported slide a unique ID (append mode must not collide with existing IDs).
+		$used_ids = array();
 		if ( 'append' === $import_mode ) {
-			$existing_slides = get_option( 'lumos_slider_slides', Lumos_Slider_Defaults::get_default_slides() );
-			$final_slides    = array_merge( $existing_slides, $sanitized_slides );
-		} else {
-			$final_slides = $sanitized_slides;
+			foreach ( $existing_slides as $existing ) {
+				$used_ids[ (string) $existing['id'] ] = true;
+			}
+		}
+		$next_id = (int) round( microtime( true ) * 1000 );
+		foreach ( $sanitized_slides as $key => $slide ) {
+			while ( isset( $used_ids[ (string) $next_id ] ) ) {
+				$next_id++;
+			}
+			$sanitized_slides[ $key ]['id'] = (string) $next_id;
+			$used_ids[ (string) $next_id ]  = true;
+			$next_id++;
 		}
 
-		update_option( 'lumos_slider_slides', $final_slides );
+		$final_slides = 'append' === $import_mode ? array_merge( array_values( $existing_slides ), $sanitized_slides ) : $sanitized_slides;
+		update_option( 'lumos_slider_slides', array_values( $final_slides ) );
 
-		// Update settings if requested
-		if ( $import_settings && ! empty( $settings_data ) ) {
+		// Restore settings if requested and present.
+		if ( $import_settings && ! empty( $package['settings'] ) ) {
+			$settings_data  = $package['settings'];
 			$defaults       = Lumos_Slider_Defaults::get_default_settings();
 			$clean_settings = array(
 				'caption'              => isset( $settings_data['caption'] ) ? sanitize_text_field( $settings_data['caption'] ) : $defaults['caption'],
@@ -1950,23 +1984,278 @@ class Lumos_Slider_Admin {
 				'loop'                 => ! empty( $settings_data['loop'] ),
 				'advance_on_video_end' => ! empty( $settings_data['advance_on_video_end'] ),
 				'slide_width'          => isset( $settings_data['slide_width'] ) ? sanitize_text_field( $settings_data['slide_width'] ) : $defaults['slide_width'],
-				'slide_height'         => isset( $settings_data['slide_height'] ) ? sanitize_text_field( $settings_data['slide_height'] ) : $defaults['slide_height'],
-				'theme'                => isset( $settings_data['theme'] ) ? sanitize_text_field( $settings_data['theme'] ) : $defaults['theme'],
+				'slide_height'         => isset( $settings_data['slide_height'] ) ? $this->sanitize_css_length( $settings_data['slide_height'], $defaults['slide_height'] ) : $defaults['slide_height'],
+				'theme'                => isset( $settings_data['theme'] ) && in_array( $settings_data['theme'], array( 'dark', 'light' ), true ) ? $settings_data['theme'] : $defaults['theme'],
 			);
 			update_option( 'lumos_slider_settings', $clean_settings );
 		}
 
-		wp_send_json_success(
-			array(
-				'message'      => sprintf(
-					/* translators: 1: number of slides, 2: number of media files */
-					__( 'Success! Imported %1$d slide(s) and %2$d media file(s).', 'lumos-deepmind-slider' ),
-					count( $sanitized_slides ),
-					$media_imported_count
-				),
-				'slides_count' => count( $sanitized_slides ),
-				'media_count'  => $media_imported_count,
-			)
+		return array(
+			'message'      => sprintf(
+				/* translators: 1: number of slides, 2: number of media files */
+				__( 'Success! Imported %1$d slide(s) and %2$d media file(s).', 'lumos-deepmind-slider' ),
+				count( $sanitized_slides ),
+				$media_imported_count
+			) . ( $media_skipped > 0 ? ' ' . sprintf(
+				/* translators: %d: number of media references that could not be restored */
+				__( '%d media reference(s) could not be restored and were cleared.', 'lumos-deepmind-slider' ),
+				$media_skipped
+			) : '' ),
+			'slides_count' => count( $sanitized_slides ),
+			'media_count'  => $media_imported_count,
+			'media_skipped' => $media_skipped,
 		);
+	}
+
+	/**
+	 * Read and validate a JSON backup.
+	 *
+	 * @param string $path Uploaded temp path.
+	 * @return array{slides: array, settings: array|null, zip: null, media: array}
+	 * @throws RuntimeException On invalid input.
+	 */
+	private function read_json_backup( $path ) {
+		if ( filesize( $path ) > 10 * 1024 * 1024 ) {
+			throw new RuntimeException( __( 'The JSON backup is too large (max 10 MB).', 'lumos-deepmind-slider' ) );
+		}
+
+		$decoded = json_decode( (string) file_get_contents( $path ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		return $this->validate_backup_manifest( $decoded );
+	}
+
+	/**
+	 * Open a ZIP backup WITHOUT extracting it to disk, and validate slides.json.
+	 *
+	 * @param string $path Uploaded temp path.
+	 * @return array{slides: array, settings: array|null, zip: ZipArchive, media: array}
+	 * @throws RuntimeException On invalid input.
+	 */
+	private function open_zip_backup( $path ) {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			throw new RuntimeException( __( 'ZipArchive PHP extension is not available on this server.', 'lumos-deepmind-slider' ) );
+		}
+
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $path ) ) {
+			throw new RuntimeException( __( 'Failed to open the uploaded ZIP archive.', 'lumos-deepmind-slider' ) );
+		}
+
+		if ( $zip->numFiles > 2000 ) {
+			$zip->close();
+			throw new RuntimeException( __( 'The ZIP archive contains too many files.', 'lumos-deepmind-slider' ) );
+		}
+
+		$max_size   = wp_max_upload_size();
+		$json_index = null;
+		$media      = array();
+
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$stat = $zip->statIndex( $i );
+			if ( ! $stat ) {
+				continue;
+			}
+
+			$name = str_replace( '\\', '/', (string) $stat['name'] );
+			if ( $this->is_unsafe_zip_path( $name ) ) {
+				$zip->close();
+				throw new RuntimeException( __( 'The archive contains an unsafe file path. Import was cancelled.', 'lumos-deepmind-slider' ) );
+			}
+
+			if ( '/' === substr( $name, -1 ) ) {
+				continue;
+			}
+
+			if ( 'slides.json' === $name ) {
+				$json_index = $i;
+			} elseif ( null === $json_index && preg_match( '#(^|/)slides\.json$#', $name ) ) {
+				$json_index = $i;
+			} elseif ( preg_match( '#(^|/)media/([^/]+)$#', $name, $m ) ) {
+				if ( (int) $stat['size'] > $max_size ) {
+					continue;
+				}
+				$media[ 'media/' . $m[2] ] = $i;
+			}
+		}
+
+		if ( null === $json_index ) {
+			$zip->close();
+			throw new RuntimeException( __( 'Invalid backup: slides.json was not found in the ZIP archive.', 'lumos-deepmind-slider' ) );
+		}
+
+		$stat = $zip->statIndex( $json_index );
+		if ( ! $stat || (int) $stat['size'] > 10 * 1024 * 1024 ) {
+			$zip->close();
+			throw new RuntimeException( __( 'slides.json is too large or unreadable.', 'lumos-deepmind-slider' ) );
+		}
+
+		$decoded = json_decode( (string) $zip->getFromIndex( $json_index ), true );
+		try {
+			$manifest = $this->validate_backup_manifest( $decoded );
+		} catch ( RuntimeException $e ) {
+			$zip->close();
+			throw $e;
+		}
+
+		$manifest['zip']   = $zip;
+		$manifest['media'] = $media;
+		return $manifest;
+	}
+
+	/**
+	 * Validate the decoded backup manifest.
+	 *
+	 * @param mixed $decoded Decoded JSON.
+	 * @return array{slides: array, settings: array|null, zip: null, media: array}
+	 * @throws RuntimeException When no slides are present.
+	 */
+	private function validate_backup_manifest( $decoded ) {
+		if ( ! is_array( $decoded ) || empty( $decoded['slides'] ) || ! is_array( $decoded['slides'] ) ) {
+			throw new RuntimeException( __( 'Invalid backup: no slide data found.', 'lumos-deepmind-slider' ) );
+		}
+
+		return array(
+			'slides'   => array_values( $decoded['slides'] ),
+			'settings' => isset( $decoded['settings'] ) && is_array( $decoded['settings'] ) ? $decoded['settings'] : null,
+			'zip'      => null,
+			'media'    => array(),
+		);
+	}
+
+	/**
+	 * Reject absolute paths and any path traversal inside a ZIP entry name.
+	 *
+	 * @param string $name Entry name.
+	 * @return bool
+	 */
+	private function is_unsafe_zip_path( $name ) {
+		if ( '' === $name || false !== strpos( $name, "\0" ) || '/' === $name[0] || false !== strpos( $name, ':' ) ) {
+			return true;
+		}
+		foreach ( explode( '/', $name ) as $segment ) {
+			if ( '..' === $segment ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Sideload media files from an open backup ZIP into the Media Library.
+	 * Files already imported earlier (same content hash) are reused, not duplicated.
+	 *
+	 * @param ZipArchive $zip             Open archive.
+	 * @param array      $media           Map of 'media/<name>' => entry index.
+	 * @param int        $imported_count  Incremented for each media file made available (by reference).
+	 * @return array Map of 'media/<name>' => new public URL.
+	 */
+	private function sideload_media( $zip, $media, &$imported_count ) {
+		$url_map = array();
+
+		$allow_svg = function ( $mimes ) {
+			$mimes['svg'] = 'image/svg+xml';
+			return $mimes;
+		};
+		add_filter( 'upload_mimes', $allow_svg );
+
+		foreach ( $media as $entry_name => $index ) {
+			$contents = $zip->getFromIndex( $index );
+			if ( false === $contents || '' === $contents ) {
+				continue;
+			}
+
+			$file_name = sanitize_file_name( basename( $entry_name ) );
+			$ext       = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
+			if ( '' === $file_name || '' === $ext ) {
+				continue;
+			}
+
+			// SVG is only accepted when it contains no active content.
+			if ( 'svg' === $ext && ! $this->is_safe_svg( $contents ) ) {
+				continue;
+			}
+
+			$hash     = sha1( $contents );
+			$existing = get_posts(
+				array(
+					'post_type'      => 'attachment',
+					'post_status'    => 'inherit',
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'meta_key'       => '_lumos_import_sha1', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+					'meta_value'     => $hash, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+					'no_found_rows'  => true,
+				)
+			);
+
+			if ( ! empty( $existing ) ) {
+				$url = wp_get_attachment_url( (int) $existing[0] );
+				if ( $url ) {
+					$url_map[ $entry_name ] = $url;
+					$imported_count++;
+				}
+				continue;
+			}
+
+			$upload = wp_upload_bits( $file_name, null, $contents );
+			if ( ! empty( $upload['error'] ) ) {
+				continue;
+			}
+
+			$wp_filetype = wp_check_filetype( $upload['file'] );
+			$attach_id   = wp_insert_attachment(
+				array(
+					'post_mime_type' => $wp_filetype['type'] ? $wp_filetype['type'] : 'application/octet-stream',
+					'post_title'     => sanitize_text_field( pathinfo( $file_name, PATHINFO_FILENAME ) ),
+					'post_content'   => '',
+					'post_status'    => 'inherit',
+				),
+				$upload['file']
+			);
+
+			if ( ! is_wp_error( $attach_id ) && $attach_id > 0 ) {
+				wp_update_attachment_metadata( $attach_id, wp_generate_attachment_metadata( $attach_id, $upload['file'] ) );
+				update_post_meta( $attach_id, '_lumos_import_sha1', $hash );
+			}
+
+			$url_map[ $entry_name ] = $upload['url'];
+			$imported_count++;
+		}
+
+		remove_filter( 'upload_mimes', $allow_svg );
+
+		return $url_map;
+	}
+
+	/**
+	 * Basic SVG safety check: no scripts, event handlers, foreign content or external references.
+	 *
+	 * @param string $svg SVG markup.
+	 * @return bool
+	 */
+	private function is_safe_svg( $svg ) {
+		if ( false === strpos( $svg, '<svg' ) ) {
+			return false;
+		}
+		return ! preg_match( '/<\s*(script|foreignobject|iframe|embed|object|use)\b|\son[a-z]+\s*=|javascript:|data:text\/html/i', $svg );
+	}
+
+	/**
+	 * Human-readable message for an upload error code.
+	 *
+	 * @param int $code PHP upload error code.
+	 * @return string
+	 */
+	private function upload_error_message( $code ) {
+		switch ( $code ) {
+			case UPLOAD_ERR_INI_SIZE:
+			case UPLOAD_ERR_FORM_SIZE:
+				return __( 'The backup file is larger than the server upload limit.', 'lumos-deepmind-slider' );
+			case UPLOAD_ERR_PARTIAL:
+				return __( 'The upload was interrupted. Please try again.', 'lumos-deepmind-slider' );
+			case UPLOAD_ERR_NO_FILE:
+				return __( 'Please select a valid export file (.zip or .json) to upload.', 'lumos-deepmind-slider' );
+			default:
+				return __( 'The server could not receive the uploaded file.', 'lumos-deepmind-slider' );
+		}
 	}
 }

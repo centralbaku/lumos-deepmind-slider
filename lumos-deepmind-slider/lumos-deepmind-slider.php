@@ -1,11 +1,9 @@
 <?php
 /**
  * Plugin Name: Lumos DeepMind Hero Slider
- * Plugin URI: https://deepmind.google/models/gemini-robotics/
  * Description: Pixel-perfect, responsive hero carousel for WordPress inspired by Google DeepMind Gemini Robotics. Supports video and image slide backgrounds, customizable scrim overlay, hero top-center and card top-left placements, touch/swipe gestures, and WordPress Media Library integration.
  * Version: 1.0.1
- * Author: Lumos & DeepMind
- * Author URI: https://deepmind.google/
+ * Author: Lumos
  * Text Domain: lumos-deepmind-slider
  * Domain Path: /languages
  * Requires at least: 5.6
@@ -79,7 +77,7 @@ final class Lumos_DeepMind_Slider_Plugin {
 		add_action( 'template_redirect', array( $this, 'handle_standalone_preview' ) );
 
 		// Initialize modules
-		new Lumos_Slider_Shortcode();
+		Lumos_Slider_Shortcode::instance();
 		new Lumos_Slider_Admin();
 		new Lumos_Slider_Block();
 	}
@@ -126,7 +124,7 @@ final class Lumos_DeepMind_Slider_Plugin {
 	 * containing only the slider (no theme header, footer, or sidebar).
 	 */
 	public function handle_standalone_preview() {
-		if ( ! isset( $_GET['lumos_slider_preview'] ) || '1' !== $_GET['lumos_slider_preview'] ) {
+		if ( ! isset( $_GET['lumos_slider_preview'] ) || '1' !== sanitize_text_field( wp_unslash( $_GET['lumos_slider_preview'] ) ) ) {
 			return;
 		}
 
@@ -138,7 +136,7 @@ final class Lumos_DeepMind_Slider_Plugin {
 		status_header( 200 );
 		nocache_headers();
 
-		$shortcode_handler = new Lumos_Slider_Shortcode();
+		$shortcode_handler = Lumos_Slider_Shortcode::instance();
 		$slider_html       = $shortcode_handler->render_shortcode( array() );
 		$version           = LUMOS_SLIDER_VERSION;
 		$css_url           = LUMOS_SLIDER_URL . 'assets/css/deepmind-slider.css?ver=' . $version;
@@ -299,6 +297,6 @@ Lumos_DeepMind_Slider_Plugin::get_instance();
  * @param array $args Optional custom attributes.
  */
 function lumos_deepmind_slider( $args = array() ) {
-	$renderer = new Lumos_Slider_Shortcode();
+	$renderer = Lumos_Slider_Shortcode::instance();
 	echo $renderer->render_shortcode( $args ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 }

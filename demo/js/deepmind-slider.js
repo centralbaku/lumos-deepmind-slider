@@ -50,6 +50,7 @@
       this.currentTranslate = 0;
       this.dragStartTime = 0;
       this.autoplayTimer = null;
+      this.wasAutoplaying = false;
       this.isPaused = false;
 
       this.init();
@@ -160,11 +161,13 @@
         this.updatePosition(false);
       }, 100));
 
-      // Page visibility
+      // Page visibility: only resume autoplay on instances that were actually playing.
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+          this.wasAutoplaying = this.autoplayTimer !== null;
           this.stopAutoplay();
-        } else if (this.options.autoplay) {
+        } else if (this.options.autoplay && this.wasAutoplaying) {
+          this.wasAutoplaying = false;
           this.startAutoplay();
         }
       });
@@ -353,20 +356,27 @@
         targetIndex = Math.max(0, Math.min(targetIndex, this.totalSlides - 1));
       }
 
+      // Jumping from the last slide to the first (or back) would sweep across every slide,
+      // so a wrap-around is shown as an instant jump instead of a long animation.
+      const isWrap = this.wrapJump === true;
+      this.wrapJump = false;
+
       this.currentIndex = targetIndex;
       this.updateClasses();
       this.updateControls();
-      this.updatePosition(animate);
+      this.updatePosition(animate && !isWrap);
       this.manageVideos();
       this.updateAnnouncer();
     }
 
     next() {
+      this.wrapJump = this.options.loop && this.currentIndex === this.totalSlides - 1;
       this.goTo(this.currentIndex + 1, true);
       this.resetAutoplayTimer();
     }
 
     prev() {
+      this.wrapJump = this.options.loop && this.currentIndex === 0;
       this.goTo(this.currentIndex - 1, true);
       this.resetAutoplayTimer();
     }
@@ -575,6 +585,11 @@
     startAutoplay() {
       this.stopAutoplay();
       this.autoplayTimer = setInterval(() => {
+        // Without loop, autoplay stops on the last slide instead of getting stuck there.
+        if (!this.options.loop && this.currentIndex >= this.totalSlides - 1) {
+          this.stopAutoplay();
+          return;
+        }
         if (!this.isPaused && !this.isDragging) {
           this.next();
         }

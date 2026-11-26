@@ -68,7 +68,7 @@ class Lumos_Slider_Block {
 	 * @return string HTML output.
 	 */
 	public function render_block( $attributes ) {
-		$shortcode_handler = new Lumos_Slider_Shortcode();
+		$shortcode_handler = Lumos_Slider_Shortcode::instance();
 		return $shortcode_handler->render_shortcode( $attributes );
 	}
 }
