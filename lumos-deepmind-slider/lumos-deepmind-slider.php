@@ -10,7 +10,7 @@
  * Domain Path: /languages
  * Requires at least: 5.6
  * Requires PHP: 7.4
- * Update URI: false
+ * Update URI: https://github.com/centralbaku/lumos-deepmind-slider
  *
  * @package LumosDeepMindSlider
  */
@@ -28,6 +28,10 @@ define( 'LUMOS_SLIDER_URL', plugin_dir_url( __FILE__ ) );
 // Load classes.
 // Shared LUMOS admin menu (identical copy ships in every Lumos plugin)
 require_once LUMOS_SLIDER_PATH . 'includes/lumos-menu.php';
+
+// Shared GitHub updater: every version pushed to main is offered as a WordPress update.
+require_once LUMOS_SLIDER_PATH . 'includes/lumos-updater.php';
+new Lumos_GitHub_Updater( LUMOS_SLIDER_FILE, 'centralbaku/lumos-deepmind-slider', LUMOS_SLIDER_VERSION );
 
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-defaults.php';
 require_once LUMOS_SLIDER_PATH . 'includes/class-slider-shortcode.php';
