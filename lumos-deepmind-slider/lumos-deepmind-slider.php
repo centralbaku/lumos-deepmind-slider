@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Lumos DeepMind Hero Slider
  * Description: Pixel-perfect, responsive hero carousel for WordPress inspired by Google DeepMind Gemini Robotics. Supports video and image slide backgrounds, customizable scrim overlay, hero top-center and card top-left placements, touch/swipe gestures, and WordPress Media Library integration.
- * Version: 1.0.1
+ * Version: 1.1.1
  * Author: Lumos
  * Text Domain: lumos-deepmind-slider
  * Domain Path: /languages
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'LUMOS_SLIDER_VERSION', '1.0.1' );
+define( 'LUMOS_SLIDER_VERSION', '1.1.1' );
 define( 'LUMOS_SLIDER_FILE', __FILE__ );
 define( 'LUMOS_SLIDER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'LUMOS_SLIDER_URL', plugin_dir_url( __FILE__ ) );
