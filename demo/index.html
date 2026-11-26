@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepMind Gemini Robotics Slider Preview</title>
+  <link rel="stylesheet" href="css/deepmind-slider.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #050608;
+      color: #ffffff;
+      font-family: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Top Demo Header Bar */
+    .demo-topbar {
+      background: rgba(14, 16, 22, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .demo-topbar__brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .demo-topbar__badge {
+      background: linear-gradient(135deg, #4285F4, #9B51E0);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .demo-topbar__title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #f1f3f4;
+      margin: 0;
+    }
+
+    .demo-topbar__actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .demo-control-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #e8eaed;
+      padding: 8px 14px;
+      border-radius: 9999px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .demo-control-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    .demo-control-btn.is-active {
+      background: #ffffff;
+      color: #101218;
+      border-color: #ffffff;
+    }
+
+    /* Live Feature Callouts */
+    .demo-features {
+      max-width: 1440px;
+      margin: 40px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .demo-feature-card {
+      background: rgba(23, 25, 35, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .demo-feature-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #e8eaed;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .demo-feature-card p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: #9aa0a6;
+      line-height: 1.5;
+    }
+
+    .demo-feature-card code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #8ab4f8;
+      font-size: 0.85em;
+    }
+
+    @media (max-width: 768px) {
+      .demo-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Demo Control Bar -->
+  <header class="demo-topbar">
+    <div class="demo-topbar__brand">
+      <span class="demo-topbar__badge">WordPress Slider</span>
+      <h1 class="demo-topbar__title">DeepMind Gemini Robotics Hero Slider</h1>
+    </div>
+    <div class="demo-topbar__actions">
+      <a href="admin.html" class="demo-control-btn" style="text-decoration:none;background:linear-gradient(135deg, #1a73e8, #9334ea);color:#fff;border-color:transparent;font-weight:600;" title="Open Slider Backend Admin Panel">
+        ⚙️ Open Slider Backend
+      </a>
+      <button class="demo-control-btn" id="btn-fast-forward" title="Jump to near end of active video to immediately test automatic slide advancement">
+        ⏩ Test Video End
+      </button>
+      <button class="demo-control-btn" id="btn-toggle-media" title="Switch Slide 1 background between video and high-res image">
+        Switch Slide 1: <span id="media-mode-text" style="font-weight: 600;">Video Active</span>
+      </button>
+      <button class="demo-control-btn" id="btn-toggle-layout" title="Toggle Slide 1 placement between Hero (Top-Center) and Card (Top-Left)">
+        Placement: <span id="layout-mode-text" style="font-weight: 600;">Top-Center</span>
+      </button>
+      <div id="wrap-autoplay-group" style="display:inline-flex;align-items:center;gap:6px;">
+        <button class="demo-control-btn" id="btn-toggle-autoplay" title="Toggle auto slideshow">
+          Auto-slide: <span id="autoplay-mode-text" style="font-weight: 600;">OFF</span>
+        </button>
+        <div id="box-speed-adjuster" style="display:none;align-items:center;gap:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:9999px;padding:4px 10px;font-size:13px;" title="Manually adjust auto-slide duration in seconds">
+          <span style="font-size:12px;color:#9aa0a6;">Time:</span>
+          <input type="number" id="input-autoplay-sec" value="6" min="1" max="60" step="1" style="width:38px;background:transparent;border:none;color:#fff;font-weight:600;font-size:13px;text-align:center;outline:none;" title="Adjust seconds manually (e.g. 6s)">
+          <span style="font-size:12px;color:#9aa0a6;">sec</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Google DeepMind Gemini Robotics Slider (Exact DOM Structure) -->
+  <section class="section--carousel section-default section--no-header spacer-block-md-bottom section-padding-top" id="cover">
+    <div class="section-container">
+      <div class="w-block-cover_carousel block-cover_carousel">
+        <section class="carousel-block carousel js-carousel spacer-block-md-bottom carousel--full-width"
+                 aria-label="Carousel"
+                 aria-roledescription="carousel"
+                 data-event-module-name="Carousel"
+                 id="carousel-gemini-robotics"
+                 data-loop="true"
+                 data-autoplay="false"
+                 data-autoplay-speed="6000"
+                 data-advance-on-video-end="true"
+                 role="region">
+
+          <div aria-atomic="true" aria-live="polite" class="sr-only" id="carousel-announcer">Slide 1 of 4</div>
+
+          <div class="embla is-loop">
+            <div class="embla__container">
+
+              <!-- SLIDE 1: Gemini Robotics 2 (Hero Top-Center Layout with looper video) -->
+              <div class="w-block-cover block-cover active-slide is-in-view" id="slide-1">
+                <section class="section-cover section-cover--top spacer-md-bottom">
+                  <div class="section-cover--full-page section-cover--scrim-dark section-cover--text-color-light">
+                    <div class="section-default cover grid cover--headline-size-medium cover--eyebrow-size-medium">
+                      
+                      <!-- Content layer -->
+                      <div class="cover__content grid__column--span-8-md grid__column--offset-2-md grid__column--span-12-sm grid__column--span-12-xs">
+                        <div class="cover__text">
+                          <h1 class="cover__text--title cover__text--title--top">Gemini Robotics 2</h1>
+                        </div>
+                        <div class="cover__text--description heading-9">
+                          <p data-block-key="x9kgi">The intelligence layer to power any kind of robot</p>
+                        </div>
+                        <div class="cover__buttons spacer-2xl-top deepai--dark cover__buttons--bottom">
+                          <div class="button-group button-group--row_centered">
+                            <div class="button-group__buttons">
+                              <a class="button button--primary icon-left"
+                                 href="https://aistudio.google.com/prompts/new_chat?model=gemini-robotics-er-2-preview"
+                                 target="_blank"
+                                 rel="noopener noreferrer">
+                                <div class="button__icon">
+                                  <!-- Google AI Studio Icon SVG -->
+                                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                    <path d="M16 11H7.5c-1.93 0-3.5-1.57-3.5-3.5S5.57 4 7.5 4H16c1.93 0 3.5 1.57 3.5 3.5S17.93 11 16 11zm-8 9h8.5c1.93 0 3.5-1.57 3.5-3.5S18.43 13 16.5 13H8c-1.93 0-3.5 1.57-3.5 3.5S6.07 20 8 20z"/>
+                                  </svg>
+                                </div>
+                                <div class="button__label">Try Gemini Robotics ER 2</div>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Media layer -->
+                      <div class="cover__media" id="slide-1-media">
+                        <div class="media-content-wrapper">
+                          <div class="media__container has-default-media spacer-block-none-bottom">
+                            <figure class="media-video-figure">
+                              <div class="media-video-container has-default-media media--aspect-16-9 --scrim"
+                                   data-height="1080"
+                                   data-width="1920">
+                                <div class="video-wrapper">
+                                  <div class="media-video-poster">
+                                    <div class="media__container has-default-media">
+                                      <picture class="image --scrim media--aspect-16-9">
+                                        <img src="https://lh3.googleusercontent.com/fOGx4E2i7mgcHrRbNvVYjkfQIrU1Wy9_HHmHeTDTPY9xZ_4BWdhuoEsHiV1HvQQD42qeP9o8whhoAxmqZNDVUBBsJ7zewDsEwk7S3Stl_CEKSR7DOg=w1440-h810-n-nu"
+                                             alt="Gemini Robotics 2"
+                                             class="picture__image"
+                                             height="810"
+                                             loading="lazy"
+                                             width="1440">
+                                      </picture>
+                                    </div>
+                                  </div>
+                                  <video class="media-video media-video--custom"
+                                         autoplay
+                                         loop
+                                         muted
+                                         playsinline
+                                         preload="auto"
+                                         poster="https://lh3.googleusercontent.com/fOGx4E2i7mgcHrRbNvVYjkfQIrU1Wy9_HHmHeTDTPY9xZ_4BWdhuoEsHiV1HvQQD42qeP9o8whhoAxmqZNDVUBBsJ7zewDsEwk7S3Stl_CEKSR7DOg">
+                                    <source type="video/webm" src="https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/rC8sZkug1fhkL2as/gemini-robotics__page-cover__hero__20.webm#t=0.1">
+                                    Your browser does not support the video tag.
+                                  </video>
+                                </div>
+                              </div>
+                            </figure>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <!-- SLIDE 2: Gemini Robotics 2 (Card Top-Left Layout with Protected Button) -->
+              <div class="w-block-cover block-cover embla__slide--peeked" id="slide-2">
+                <section class="section-cover spacer-md-bottom">
+                  <div class="section-cover--full-page section-cover--scrim-dark section-cover--text-color-light section-cover--full-page-small-text">
+                    <div class="section-default cover grid cover--headline-size-small cover--eyebrow-size-medium">
+                      
+                      <div class="cover__content grid__column--span-8-md grid__column--offset-2-md grid__column--span-12-sm grid__column--span-12-xs">
+                        <div class="cover__text">
+                          <h2 class="cover__text--title">Gemini Robotics 2</h2>
+                        </div>
+                        <div class="cover__text--description heading-9">
+                          <p data-block-key="x9kgi">Our most advanced VLA model: capable of intelligently controlling any type of robot, from bi-arms to full humanoids</p>
+                        </div>
+                        <div class="cover__buttons spacer-2xl-top deepai--dark">
+                          <div class="button-group button-group--row button-group--compact compact">
+                            <div class="button-group__buttons">
+                              <a class="button button--protected icon-none"
+                                 href="https://deepmind.google/models/gemini-robotics/vla/"
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 aria-label="Learn more about Gemini Robotics 2">
+                                <div class="button__label">Learn more</div>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="cover__media">
+                        <div class="media-content-wrapper">
+                          <div class="media__container has-default-media spacer-block-none-bottom">
+                            <figure class="media-video-figure">
+                              <div class="media-video-container has-default-media media--aspect-16-9 --scrim"
+                                   data-height="1080"
+                                   data-width="1920">
+                                <div class="video-wrapper">
+                                  <div class="media-video-poster">
+                                    <div class="media__container has-default-media">
+                                      <picture class="image --scrim media--aspect-16-9">
+                                        <img src="https://lh3.googleusercontent.com/mWKuxNu0Ecmt2mgrcNrbL6U5vNI9-H87ra9VUMd_baMkwnXy6L5Fwxu-1RtXhZ8cnpMXWeWSMUNMtwtMSMMqEAQ70nJ5G_EGRnirjEP6Dg58xQO5BA=w1440-h810-n-nu"
+                                             alt="Gemini Robotics 2 VLA"
+                                             class="picture__image"
+                                             height="810"
+                                             loading="lazy"
+                                             width="1440">
+                                      </picture>
+                                    </div>
+                                  </div>
+                                  <video class="media-video media-video--custom"
+                                         autoplay
+                                         loop
+                                         muted
+                                         playsinline
+                                         preload="auto"
+                                         poster="https://lh3.googleusercontent.com/mWKuxNu0Ecmt2mgrcNrbL6U5vNI9-H87ra9VUMd_baMkwnXy6L5Fwxu-1RtXhZ8cnpMXWeWSMUNMtwtMSMMqEAQ70nJ5G_EGRnirjEP6Dg58xQO5BA">
+                                    <source type="video/webm" src="https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/MVCfTE-4h3AwDVPZ/gemini-robotics__page-cover__vla.webm#t=0.1">
+                                    Your browser does not support the video tag.
+                                  </video>
+                                </div>
+                              </div>
+                            </figure>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <!-- SLIDE 3: Gemini Robotics ER 2 (Card Layout with 2 Buttons: Protected + Text Link) -->
+              <div class="w-block-cover block-cover embla__slide--peeked" id="slide-3">
+                <section class="section-cover spacer-md-bottom">
+                  <div class="section-cover--full-page section-cover--scrim-dark section-cover--text-color-light section-cover--full-page-small-text">
+                    <div class="section-default cover grid cover--headline-size-small cover--eyebrow-size-medium">
+                      
+                      <div class="cover__content grid__column--span-8-md grid__column--offset-2-md grid__column--span-12-sm grid__column--span-12-xs">
+                        <div class="cover__text">
+                          <h2 class="cover__text--title">Gemini Robotics ER 2</h2>
+                        </div>
+                        <div class="cover__text--description heading-9">
+                          <p data-block-key="x9kgi">Our embodied reasoning model: capable of real-world understanding and complex, multi-step planning</p>
+                        </div>
+                        <div class="cover__buttons spacer-2xl-top deepai--dark">
+                          <div class="button-group button-group--row button-group--compact compact">
+                            <div class="button-group__buttons">
+                              <a class="button button--protected icon-none"
+                                 href="https://deepmind.google/models/gemini-robotics/embodied-reasoning/"
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 aria-label="Learn more about Gemini Robotics ER 2">
+                                <div class="button__label">Learn more</div>
+                              </a>
+                              <a class="button button--text icon-right"
+                                 href="https://aistudio.google.com/prompts/new_chat?model=gemini-robotics-er-2-preview"
+                                 target="_blank"
+                                 rel="noopener noreferrer">
+                                <div class="button__label">Try Gemini Robotics ER 2</div>
+                                <div class="button__icon">
+                                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z"/>
+                                  </svg>
+                                </div>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="cover__media">
+                        <div class="media-content-wrapper">
+                          <div class="media__container has-default-media spacer-block-none-bottom">
+                            <figure class="media-video-figure">
+                              <div class="media-video-container has-default-media media--aspect-16-9 --scrim"
+                                   data-height="1080"
+                                   data-width="1920">
+                                <div class="video-wrapper">
+                                  <div class="media-video-poster">
+                                    <div class="media__container has-default-media">
+                                      <picture class="image --scrim media--aspect-16-9">
+                                        <img src="https://lh3.googleusercontent.com/9zg2J_n0cld-LnixaQiHRjA8bORzbUjRFXi3lSx_akPTXqgF6PR1vX2935QjiTC48HP7Zc62zES-9y6sZjTEGdRrxMm6iJIWjFK4y_5yl8u1ABuG=w1440-h810-n-nu"
+                                             alt="Gemini Robotics ER 2"
+                                             class="picture__image"
+                                             height="810"
+                                             loading="lazy"
+                                             width="1440">
+                                      </picture>
+                                    </div>
+                                  </div>
+                                  <video class="media-video media-video--custom"
+                                         autoplay
+                                         loop
+                                         muted
+                                         playsinline
+                                         poster="https://lh3.googleusercontent.com/9zg2J_n0cld-LnixaQiHRjA8bORzbUjRFXi3lSx_akPTXqgF6PR1vX2935QjiTC48HP7Zc62zES-9y6sZjTEGdRrxMm6iJIWjFK4y_5yl8u1ABuG">
+                                    <source type="video/webm" src="https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/rC8sZkug1fhkL2as/gemini-robotics__page-cover__er.webm#t=0.1">
+                                    Your browser does not support the video tag.
+                                  </video>
+                                </div>
+                              </div>
+                            </figure>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <!-- SLIDE 4: Gemini Robotics On-Device 2 (Image Background Slide) -->
+              <div class="w-block-cover block-cover embla__slide--peeked" id="slide-4">
+                <section class="section-cover spacer-md-bottom">
+                  <div class="section-cover--full-page section-cover--scrim-dark section-cover--text-color-light section-cover--full-page-small-text">
+                    <div class="section-default cover grid cover--headline-size-small cover--eyebrow-size-medium">
+                      
+                      <div class="cover__content grid__column--span-8-md grid__column--offset-2-md grid__column--span-12-sm grid__column--span-12-xs">
+                        <div class="cover__logo cover__logo--top cover__logo--left">
+                          <img src="assets/images/deepmind-sparkle.svg" alt="DeepMind Sparkle" class="slide-logo-img">
+                        </div>
+                        <div class="cover__text">
+                          <h2 class="cover__text--title">Gemini Robotics On-Device 2</h2>
+                        </div>
+                        <div class="cover__text--description heading-9">
+                          <p data-block-key="x9kgi">Our most efficient VLA model, optimized to run locally on robotic devices</p>
+                        </div>
+                        <div class="cover__buttons spacer-2xl-top deepai--dark">
+                          <div class="button-group button-group--row button-group--compact compact">
+                            <div class="button-group__buttons">
+                              <a class="button button--protected icon-none"
+                                 href="https://deepmind.google/models/gemini-robotics/on-device/"
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 aria-label="Learn more about Gemini Robotics On-Device 2">
+                                <div class="button__label">Learn more</div>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- High resolution image background demonstration -->
+                      <div class="cover__media">
+                        <div class="media-content-wrapper">
+                          <div class="media__container has-default-media spacer-block-none-bottom">
+                            <figure class="media-video-figure">
+                              <div class="media-video-container has-default-media media--aspect-16-9 --scrim">
+                                <picture class="image --scrim media--aspect-16-9">
+                                  <source srcset="https://lh3.googleusercontent.com/1OBfM3QyH93IeOIbVqsGjHNj8AZyOlJti8lZqIiTb4hrbN4-t_EYHeaVBhaGqAWfqs3WwZlvTzE4VNxdLNSb_69GopywJb_OdsPjX4kNVSzRxAUqTGM=w1920-h1080-n-nu" media="(min-width: 1024px)">
+                                  <img src="https://lh3.googleusercontent.com/1OBfM3QyH93IeOIbVqsGjHNj8AZyOlJti8lZqIiTb4hrbN4-t_EYHeaVBhaGqAWfqs3WwZlvTzE4VNxdLNSb_69GopywJb_OdsPjX4kNVSzRxAUqTGM=w1200-h675-n-nu"
+                                       alt="Gemini Robotics On-Device 2"
+                                       class="picture__image"
+                                       loading="lazy">
+                                </picture>
+                              </div>
+                            </figure>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Bottom Navigation Controls & Caption -->
+          <div class="carousel__pagination">
+            <figcaption class="caption carousel__caption">
+              <div class="caption__text text-caption caption--fill">Explore the latest</div>
+            </figcaption>
+            <div>
+              <div class="combo-button-group">
+                <button aria-controls="carousel-gemini-robotics"
+                        aria-label="Previous"
+                        class="js-carousel__button--prev">
+                  <span aria-hidden="true" class="icon-md-fill">
+                    <svg viewBox="0 -960 960 960" aria-hidden="true" fill="currentColor" height="24px" width="24px">
+                      <path d="M560.62-253.85 333.85-480.62l226.77-227.15 32.61 32.62-194.15 194.53 194.15 194.16-32.61 32.61Z"/>
+                    </svg>
+                  </span>
+                </button>
+                <button aria-controls="carousel-gemini-robotics"
+                        aria-label="Next"
+                        class="js-carousel__button--next">
+                  <span aria-hidden="true" class="icon-md-fill">
+                    <svg viewBox="0 -960 960 960" aria-hidden="true" fill="currentColor" height="24px" width="24px">
+                      <path d="M536.92-480.62 342.77-675.15l32.61-32.62 226.77 227.15-226.77 226.77-32.61-32.61 194.15-194.16Z"/>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+      <div class="demo-feature-card">
+      <h3>🔌 WordPress Ready</h3>
+      <p>Packaged as a full WordPress plugin with an intuitive Admin Slides Manager, Media Uploader integration, Gutenberg block, and <code>[deepmind_slider]</code> shortcode.</p>
+    </div>
+  </section>
+
+  <!-- Live Feature Info Cards -->
+  <section class="demo-features">
+    <div class="demo-feature-card">
+      <h3>🎬 Video & Image Backgrounds</h3>
+      <p>Supports seamless HTML5 MP4/WebM videos with autoplay, muted loop, and poster fallback, as well as ultra-sharp responsive images via WordPress Media Library.</p>
+    </div>
+    <div class="demo-feature-card">
+      <h3>📐 1:1 Responsive Structure</h3>
+      <p>Exact DeepMind layout with <code>93.5%</code> card width, edge slide peeking, <code>36px</code> smooth rounded corners, and dark scrim gradients for pristine text legibility.</p>
+      <p>Offers both <strong>Hero Top-Center</strong> (centered title + bottom CTA) and <strong>Card Top-Left</strong> (anchored left alignment with multiple pill buttons) layouts.</p>
+    </div>
+    <div class="demo-feature-card">
+    </div>
+    </div>
+  </section>
+
+  <script src="js/deepmind-slider.js"></script>
+
+  <!-- Interactive Controls & Dynamic LocalStorage Loader Script -->
+  <script>
+    (function () {
+      const DEFAULT_SLIDES = [
+        {
+          id: 1,
+          active: true,
+          title: "Gemini Robotics 2",
+          title_tag: "h1",
+          layout: "top-center",
+          description: "The intelligence layer to power any kind of robot",
+          media_type: "video",
+          video_url: "https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/rC8sZkug1fhkL2as/gemini-robotics__page-cover__hero__20.webm#t=0.1",
+          poster_url: "https://lh3.googleusercontent.com/fOGx4E2i7mgcHrRbNvVYjkfQIrU1Wy9_HHmHeTDTPY9xZ_4BWdhuoEsHiV1HvQQD42qeP9o8whhoAxmqZNDVUBBsJ7zewDsEwk7S3Stl_CEKSR7DOg=w1440-h810-n-nu",
+          image_url: "",
+          scrim_type: "scrim-dark",
+          button_1_enable: true,
+          button_1_text: "Try Gemini Robotics ER 2",
+          button_1_url: "https://aistudio.google.com/prompts/new_chat?model=gemini-robotics-er-2-preview",
+          button_1_target: "_blank",
+          button_1_style: "primary",
+          button_1_icon: "ai_studio",
+          button_2_enable: false,
+          button_2_text: "",
+          button_2_url: "",
+          button_2_target: "_self",
+          button_2_style: "protected",
+          button_2_icon: "none"
+        },
+        {
+          id: 2,
+          active: true,
+          title: "Gemini Robotics 2",
+          title_tag: "h2",
+          layout: "top-left",
+          description: "Our most advanced VLA model: capable of intelligently controlling any type of robot, from bi-arms to full humanoids",
+          media_type: "video",
+          video_url: "https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/MVCfTE-4h3AwDVPZ/gemini-robotics__page-cover__vla.webm#t=0.1",
+          poster_url: "https://lh3.googleusercontent.com/mWKuxNu0Ecmt2mgrcNrbL6U5vNI9-H87ra9VUMd_baMkwnXy6L5Fwxu-1RtXhZ8cnpMXWeWSMUNMtwtMSMMqEAQ70nJ5G_EGRnirjEP6Dg58xQO5BA=w1440-h810-n-nu",
+          image_url: "",
+          scrim_type: "scrim-dark",
+          button_1_enable: true,
+          button_1_text: "Learn more",
+          button_1_url: "https://deepmind.google/models/gemini-robotics/vla/",
+          button_1_target: "_blank",
+          button_1_style: "protected",
+          button_1_icon: "none",
+          button_2_enable: false,
+          button_2_text: "",
+          button_2_url: "",
+          button_2_target: "_self",
+          button_2_style: "text",
+          button_2_icon: "none"
+        },
+        {
+          id: 3,
+          active: true,
+          title: "Gemini Robotics ER 2",
+          title_tag: "h2",
+          layout: "top-left",
+          description: "Our embodied reasoning model: capable of real-world understanding and complex, multi-step planning",
+          media_type: "video",
+          video_url: "https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/rC8sZkug1fhkL2as/gemini-robotics__page-cover__er.webm#t=0.1",
+          poster_url: "https://lh3.googleusercontent.com/9zg2J_n0cld-LnixaQiHRjA8bORzbUjRFXi3lSx_akPTXqgF6PR1vX2935QjiTC48HP7Zc62zES-9y6sZjTEGdRrxMm6iJIWjFK4y_5yl8u1ABuG=w1440-h810-n-nu",
+          image_url: "",
+          scrim_type: "scrim-dark",
+          button_1_enable: true,
+          button_1_text: "Learn more",
+          button_1_url: "https://deepmind.google/models/gemini-robotics/embodied-reasoning/",
+          button_1_target: "_blank",
+          button_1_style: "protected",
+          button_1_icon: "none",
+          button_2_enable: true,
+          button_2_text: "Try Gemini Robotics ER 2",
+          button_2_url: "https://aistudio.google.com/prompts/new_chat?model=gemini-robotics-er-2-preview",
+          button_2_target: "_blank",
+          button_2_style: "text",
+          button_2_icon: "arrow_right"
+        },
+        {
+          id: 4,
+          active: true,
+          title: "Gemini Robotics On-Device 2",
+          title_tag: "h2",
+          layout: "top-left",
+          description: "Our most efficient VLA model, optimized to run locally on robotic devices",
+          media_type: "image",
+          video_url: "",
+          poster_url: "",
+          image_url: "https://lh3.googleusercontent.com/1OBfM3QyH93IeOIbVqsGjHNj8AZyOlJti8lZqIiTb4hrbN4-t_EYHeaVBhaGqAWfqs3WwZlvTzE4VNxdLNSb_69GopywJb_OdsPjX4kNVSzRxAUqTGM=w1920-h1080-n-nu",
+          scrim_type: "scrim-dark",
+          button_1_enable: true,
+          button_1_text: "Learn more",
+          button_1_url: "https://deepmind.google/models/gemini-robotics/on-device/",
+          button_1_target: "_blank",
+          button_1_style: "protected",
+          button_1_icon: "none",
+          button_2_enable: false,
+          button_2_text: "",
+          button_2_url: "",
+          button_2_target: "_self",
+          button_2_style: "text",
+          button_2_icon: "none"
+        }
+      ];
+
+      function renderIconSvg(icon) {
+        if (icon === 'ai_studio') {
+          return '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16 11H7.5c-1.93 0-3.5-1.57-3.5-3.5S5.57 4 7.5 4H16c1.93 0 3.5 1.57 3.5 3.5S17.93 11 16 11zm-8 9h8.5c1.93 0 3.5-1.57 3.5-3.5S18.43 13 16.5 13H8c-1.93 0-3.5 1.57-3.5 3.5S6.07 20 8 20z"/></svg>';
+        } else if (icon === 'arrow_right') {
+          return '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z"/></svg>';
+        } else if (icon === 'external') {
+          return '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+        }
+        return '';
+      }
+
+      function renderButtonHtml(slide, btnNum) {
+        const prefix = `button_${btnNum}_`;
+        const text = slide[prefix + 'text'] || '';
+        const url = slide[prefix + 'url'] || '#';
+        const target = slide[prefix + 'target'] || '_self';
+        const style = slide[prefix + 'style'] || (btnNum === 1 ? 'primary' : 'protected');
+        const icon = slide[prefix + 'icon'] || 'none';
+
+        let btnClass = 'button';
+        if (style === 'primary') btnClass += ' button--primary';
+        else if (style === 'protected') btnClass += ' button--protected';
+        else if (style === 'text') btnClass += ' button--text';
+
+        const isLeftIcon = icon === 'ai_studio';
+        const isRightIcon = icon === 'arrow_right' || icon === 'external';
+
+        if (isLeftIcon) btnClass += ' icon-left';
+        else if (isRightIcon) btnClass += ' icon-right';
+        else btnClass += ' icon-none';
+
+        const iconSvg = renderIconSvg(icon);
+
+        return `
+          <a class="${btnClass}" href="${url}" target="${target}" ${target === '_blank' ? 'rel="noopener noreferrer"' : ''}>
+            ${isLeftIcon ? `<div class="button__icon">${iconSvg}</div>` : ''}
+            <div class="button__label">${text}</div>
+            ${isRightIcon ? `<div class="button__icon">${iconSvg}</div>` : ''}
+          </a>
+        `;
+      }
+
+      function renderSlideCard(slide, index) {
+        const isFirst = index === 0;
+        const slideClass = isFirst ? 'active-slide is-in-view' : 'embla__slide--peeked';
+        const layout = slide.layout || 'top-center';
+        const isTopCenter = layout === 'top-center';
+        const titleTag = slide.title_tag || (isTopCenter ? 'h1' : 'h2');
+        const scrimType = slide.scrim_type || 'scrim-dark';
+        const mediaType = slide.media_type || 'video';
+
+        const btn1Enabled = !!slide.button_1_enable && !!slide.button_1_text;
+        const btn2Enabled = !!slide.button_2_enable && !!slide.button_2_text;
+
+        let buttonsMarkup = '';
+        if (btn1Enabled || btn2Enabled) {
+          const btnGroupClass = isTopCenter ? 'button-group--row_centered' : 'button-group--row button-group--compact compact';
+          const wrapperClass = isTopCenter ? 'cover__buttons spacer-2xl-top deepai--dark cover__buttons--bottom' : 'cover__buttons spacer-2xl-top deepai--dark';
+          buttonsMarkup = `
+            <div class="${wrapperClass}">
+              <div class="button-group ${btnGroupClass}">
+                <div class="button-group__buttons">
+                  ${btn1Enabled ? renderButtonHtml(slide, 1) : ''}
+                  ${btn2Enabled ? renderButtonHtml(slide, 2) : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        let mediaMarkup = '';
+        if (mediaType === 'video' && (slide.video_url || slide.video_webm_url)) {
+          const videoSrc = slide.video_url || slide.video_webm_url;
+          mediaMarkup = `
+            <div class="video-wrapper">
+              ${slide.poster_url ? `
+                <div class="media-video-poster">
+                  <div class="media__container has-default-media">
+                    <picture class="image --scrim media--aspect-16-9">
+                      <img src="${slide.poster_url}" alt="${slide.title || ''}" class="picture__image" height="810" loading="lazy" width="1440">
+                    </picture>
+                  </div>
+                </div>
+              ` : ''}
+              <video class="media-video media-video--custom" autoplay muted playsinline ${slide.poster_url ? `poster="${slide.poster_url}"` : ''}>
+                <source src="${videoSrc}" type="${videoSrc.includes('.webm') ? 'video/webm' : 'video/mp4'}">
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          `;
+        } else if (slide.image_url) {
+          mediaMarkup = `
+            <picture class="image --scrim media--aspect-16-9">
+              <img src="${slide.image_url}" alt="${slide.title || ''}" class="picture__image" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+            </picture>
+          `;
+        }
+
+        return `
+          <div class="w-block-cover block-cover ${slideClass}" ${isFirst ? 'id="slide-1"' : ''} data-slide-index="${index}">
+            <section class="section-cover ${isTopCenter ? 'section-cover--top' : ''} spacer-md-bottom">
+              <div class="section-cover--full-page section-cover--${scrimType} section-cover--text-color-light ${!isTopCenter ? 'section-cover--full-page-small-text' : ''}">
+                <div class="section-default cover grid ${isTopCenter ? 'cover--headline-size-medium' : 'cover--headline-size-small'} cover--eyebrow-size-medium">
+                  
+                  <!-- Content layer -->
+                  <div class="cover__content grid__column--span-8-md grid__column--offset-2-md grid__column--span-12-sm grid__column--span-12-xs">
+                    <div class="cover__text">
+                      <${titleTag} class="cover__text--title ${isTopCenter ? 'cover__text--title--top' : ''}">${slide.title || ''}</${titleTag}>
+                    </div>
+                    ${slide.description ? `
+                      <div class="cover__text--description heading-9">
+                        <p>${slide.description}</p>
+                      </div>
+                    ` : ''}
+                    ${buttonsMarkup}
+                  </div>
+
+                  <!-- Media background layer -->
+                  <div class="cover__media" ${isFirst ? 'id="slide-1-media"' : ''}>
+                    <div class="media-content-wrapper">
+                      <div class="media__container has-default-media spacer-block-none-bottom">
+                        <figure class="media-video-figure">
+                          <div class="media-video-container has-default-media media--aspect-16-9 --scrim" data-height="1080" data-width="1920">
+                            ${mediaMarkup}
+                          </div>
+                        </figure>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </section>
+          </div>
+        `;
+      }
+
+      // Check localStorage for customized slides
+      let storedSlides = null;
+      try {
+        const raw = localStorage.getItem('lumos_deepmind_slides');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) storedSlides = parsed;
+        }
+      } catch (e) {}
+
+      if (!storedSlides) {
+        storedSlides = DEFAULT_SLIDES;
+        try { localStorage.setItem('lumos_deepmind_slides', JSON.stringify(DEFAULT_SLIDES)); } catch(e){}
+      }
+
+      // Filter active slides (User can turn on and off slides)
+      const activeSlides = storedSlides.filter(s => s.active !== false);
+      const containerEl = document.querySelector('.embla__container');
+
+      if (containerEl && activeSlides.length > 0) {
+        containerEl.innerHTML = activeSlides.map((slide, i) => renderSlideCard(slide, i)).join('');
+        const announcerEl = document.getElementById('carousel-announcer');
+        if (announcerEl) announcerEl.textContent = `Slide 1 of ${activeSlides.length}`;
+      }
+
+      // Initialize DeepMind carousel
+      const carouselEl = document.getElementById('carousel-gemini-robotics');
+      if (carouselEl && window.LumosSlider) {
+        window.LumosSlider.init();
+      }
+
+      // Interactive controls on demo header bar
+      setTimeout(() => {
+        const instance = carouselEl ? carouselEl.deepMindCarouselInstance : null;
+        if (!instance) return;
+
+        // Fast-Forward active video to near-end (Testing feature)
+        const btnFastForward = document.getElementById('btn-fast-forward');
+        if (btnFastForward) {
+          btnFastForward.addEventListener('click', function () {
+            const activeSlide = instance.slides[instance.currentIndex];
+            const video = activeSlide ? activeSlide.querySelector('video') : null;
+            if (video) {
+              if (video.duration && !isNaN(video.duration)) {
+                video.currentTime = Math.max(0, video.duration - 0.7);
+              } else {
+                video.currentTime = 12;
+              }
+              const pp = video.play();
+              if (pp !== undefined) pp.catch(() => {});
+            }
+          });
+        }
+
+        // 1. Toggle Slide 1 Media: Video vs Image
+        const btnToggleMedia = document.getElementById('btn-toggle-media');
+        const mediaModeText = document.getElementById('media-mode-text');
+        const slide1Media = document.getElementById('slide-1-media');
+
+        let isVideo = true;
+        if (btnToggleMedia && slide1Media) {
+          btnToggleMedia.addEventListener('click', function () {
+            isVideo = !isVideo;
+            if (isVideo) {
+              mediaModeText.textContent = 'Video Active';
+              slide1Media.innerHTML = `
+                <div class="media-content-wrapper">
+                  <div class="media__container has-default-media spacer-block-none-bottom">
+                    <figure class="media-video-figure">
+                      <div class="media-video-container has-default-media media--aspect-16-9 --scrim" data-height="1080" data-width="1920">
+                        <div class="video-wrapper">
+                          <div class="media-video-poster">
+                            <div class="media__container has-default-media">
+                              <picture class="image --scrim media--aspect-16-9">
+                                <img src="https://lh3.googleusercontent.com/fOGx4E2i7mgcHrRbNvVYjkfQIrU1Wy9_HHmHeTDTPY9xZ_4BWdhuoEsHiV1HvQQD42qeP9o8whhoAxmqZNDVUBBsJ7zewDsEwk7S3Stl_CEKSR7DOg=w1440-h810-n-nu" alt="Gemini Robotics 2" class="picture__image" height="810" loading="lazy" width="1440">
+                              </picture>
+                            </div>
+                          </div>
+                          <video class="media-video media-video--custom" autoplay muted playsinline poster="https://lh3.googleusercontent.com/fOGx4E2i7mgcHrRbNvVYjkfQIrU1Wy9_HHmHeTDTPY9xZ_4BWdhuoEsHiV1HvQQD42qeP9o8whhoAxmqZNDVUBBsJ7zewDsEwk7S3Stl_CEKSR7DOg">
+                            <source type="video/webm" src="https://storage.googleapis.com/gdm-deepmind-com-prod-public/media/rC8sZkug1fhkL2as/gemini-robotics__page-cover__hero__20.webm#t=0.1">
+                          </video>
+                        </div>
+                      </div>
+                    </figure>
+                  </div>
+                </div>`;
+              instance.manageVideos();
+            } else {
+              mediaModeText.textContent = 'Image Active';
+              slide1Media.innerHTML = `
+                <div class="media-content-wrapper">
+                  <div class="media__container has-default-media spacer-block-none-bottom">
+                    <figure class="media-video-figure">
+                      <div class="media-video-container has-default-media media--aspect-16-9 --scrim">
+                        <picture class="image --scrim media--aspect-16-9">
+                          <img src="https://lh3.googleusercontent.com/mWKuxNu0Ecmt2mgrcNrbL6U5vNI9-H87ra9VUMd_baMkwnXy6L5Fwxu-1RtXhZ8cnpMXWeWSMUNMtwtMSMMqEAQ70nJ5G_EGRnirjEP6Dg58xQO5BA=w1920-h1080-n-nu" alt="Image Background" class="picture__image" style="width:100%;height:100%;object-fit:cover;">
+                        </picture>
+                      </div>
+                    </figure>
+                  </div>
+                </div>`;
+            }
+          });
+        }
+
+        // 2. Toggle Slide 1 Layout
+        const btnToggleLayout = document.getElementById('btn-toggle-layout');
+        const layoutModeText = document.getElementById('layout-mode-text');
+        const slide1 = document.getElementById('slide-1');
+
+        if (btnToggleLayout && slide1) {
+          const slide1SectionCover = slide1.querySelector('.section-cover');
+          const slide1FullPage = slide1.querySelector('.section-cover--full-page');
+          const slide1Buttons = slide1.querySelector('.cover__buttons');
+          const slide1BtnGroup = slide1.querySelector('.button-group');
+
+          let isTopCenter = true;
+          btnToggleLayout.addEventListener('click', function () {
+            isTopCenter = !isTopCenter;
+            if (isTopCenter) {
+              layoutModeText.textContent = 'Top-Center';
+              if (slide1SectionCover) slide1SectionCover.classList.add('section-cover--top');
+              if (slide1FullPage) slide1FullPage.classList.remove('section-cover--full-page-small-text');
+              if (slide1Buttons) slide1Buttons.classList.add('cover__buttons--bottom');
+              if (slide1BtnGroup) {
+                slide1BtnGroup.classList.remove('button-group--row', 'button-group--compact', 'compact');
+                slide1BtnGroup.classList.add('button-group--row_centered');
+              }
+            } else {
+              layoutModeText.textContent = 'Top-Left';
+              if (slide1SectionCover) slide1SectionCover.classList.remove('section-cover--top');
+              if (slide1FullPage) slide1FullPage.classList.add('section-cover--full-page-small-text');
+              if (slide1Buttons) slide1Buttons.classList.remove('cover__buttons--bottom');
+              if (slide1BtnGroup) {
+                slide1BtnGroup.classList.remove('button-group--row_centered');
+                slide1BtnGroup.classList.add('button-group--row', 'button-group--compact', 'compact');
+              }
+            }
+          });
+        }
+
+        // 3. Toggle Autoplay & Manual Time Adjuster
+        const btnToggleAutoplay = document.getElementById('btn-toggle-autoplay');
+        const autoplayModeText = document.getElementById('autoplay-mode-text');
+        const boxSpeedAdjuster = document.getElementById('box-speed-adjuster');
+        const inputAutoplaySec = document.getElementById('input-autoplay-sec');
+
+        let autoplayOn = false;
+        let autoplaySeconds = 6;
+
+        // Check if settings in localStorage have custom autoplay or speed
+        try {
+          const raw = localStorage.getItem('lumos_slider_settings');
+          if (raw) {
+            const s = JSON.parse(raw);
+            if (s.autoplay_speed) {
+              autoplaySeconds = s.autoplay_speed < 100 ? s.autoplay_speed : Math.round(s.autoplay_speed / 1000);
+              if (inputAutoplaySec) inputAutoplaySec.value = autoplaySeconds;
+            }
+            if (s.autoplay) {
+              autoplayOn = true;
+            }
+          }
+        } catch (e) {}
+
+        function applyAutoplayState() {
+          instance.options.autoplay = autoplayOn;
+          instance.options.autoplaySpeed = autoplaySeconds * 1000;
+          if (autoplayOn) {
+            autoplayModeText.textContent = `ON (${autoplaySeconds}s)`;
+            btnToggleAutoplay.classList.add('is-active');
+            if (boxSpeedAdjuster) boxSpeedAdjuster.style.display = 'inline-flex';
+            instance.startAutoplay();
+          } else {
+            autoplayModeText.textContent = 'OFF';
+            btnToggleAutoplay.classList.remove('is-active');
+            if (boxSpeedAdjuster) boxSpeedAdjuster.style.display = 'none';
+            instance.stopAutoplay();
+          }
+        }
+
+        if (btnToggleAutoplay) {
+          btnToggleAutoplay.addEventListener('click', function () {
+            autoplayOn = !autoplayOn;
+            applyAutoplayState();
+          });
+        }
+
+        if (inputAutoplaySec) {
+          inputAutoplaySec.addEventListener('input', function () {
+            const val = parseFloat(this.value);
+            if (!isNaN(val) && val > 0) {
+              autoplaySeconds = val;
+              instance.options.autoplaySpeed = autoplaySeconds * 1000;
+              autoplayModeText.textContent = `ON (${autoplaySeconds}s)`;
+              if (autoplayOn) {
+                instance.startAutoplay();
+              }
+            }
+          });
+        }
+
+        if (autoplayOn) {
+          applyAutoplayState();
+        }
+      }, 50);
+    })();
+  </script>
+</body>
+</html>
