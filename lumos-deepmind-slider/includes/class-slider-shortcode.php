@@ -12,11 +12,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Lumos_Slider_Shortcode {
 
 	/**
-	 * Constructor
+	 * Shared instance (shortcodes are registered once).
+	 *
+	 * @var Lumos_Slider_Shortcode|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get the shared instance.
+	 *
+	 * @return Lumos_Slider_Shortcode
+	 */
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor (use instance() instead).
 	 */
 	public function __construct() {
 		add_shortcode( 'deepmind_slider', array( $this, 'render_shortcode' ) );
 		add_shortcode( 'lumos_slider', array( $this, 'render_shortcode' ) );
+	}
+
+	/**
+	 * Normalise a boolean-ish value (bool, 'true'/'false', 1/0, '1'/'0') to 'true' or 'false'.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	private function bool_string( $value ) {
+		if ( is_string( $value ) ) {
+			$value = strtolower( trim( $value ) );
+			return in_array( $value, array( 'true', '1', 'yes', 'on' ), true ) ? 'true' : 'false';
+		}
+		return $value ? 'true' : 'false';
 	}
 
 	/**
@@ -49,18 +82,26 @@ class Lumos_Slider_Shortcode {
 
 		$atts = shortcode_atts(
 			array(
-				'id'             => 'deepmind-' . wp_rand( 1000, 9999 ),
-				'caption'        => isset( $settings['caption'] ) ? $settings['caption'] : 'Explore the latest',
-				'autoplay'       => isset( $settings['autoplay'] ) ? ( $settings['autoplay'] ? 'true' : 'false' ) : 'false',
-				'autoplay_speed' => isset( $settings['autoplay_speed'] ) ? $settings['autoplay_speed'] : 6000,
-				'loop'                 => isset( $settings['loop'] ) ? ( $settings['loop'] ? 'true' : 'false' ) : 'true',
-				'advance_on_video_end' => isset( $settings['advance_on_video_end'] ) ? ( $settings['advance_on_video_end'] ? 'true' : 'false' ) : 'true',
+				'id'                   => 'deepmind-' . wp_rand( 1000, 9999 ),
+				'caption'              => isset( $settings['caption'] ) ? $settings['caption'] : 'Explore the latest',
+				'autoplay'             => isset( $settings['autoplay'] ) ? $this->bool_string( $settings['autoplay'] ) : 'false',
+				'autoplay_speed'       => isset( $settings['autoplay_speed'] ) ? $settings['autoplay_speed'] : 6000,
+				'loop'                 => isset( $settings['loop'] ) ? $this->bool_string( $settings['loop'] ) : 'true',
+				'advance_on_video_end' => isset( $settings['advance_on_video_end'] ) ? $this->bool_string( $settings['advance_on_video_end'] ) : 'true',
 				'height'               => isset( $settings['slide_height'] ) ? $settings['slide_height'] : '',
 				'theme'                => isset( $settings['theme'] ) ? $settings['theme'] : 'dark',
 			),
-			$atts,
+			(array) $atts,
 			'deepmind_slider'
 		);
+
+		// Normalise values coming from shortcode attributes or the block editor.
+		$atts['autoplay']             = $this->bool_string( $atts['autoplay'] );
+		$atts['loop']                 = $this->bool_string( $atts['loop'] );
+		$atts['advance_on_video_end'] = $this->bool_string( $atts['advance_on_video_end'] );
+		$atts['id']                   = sanitize_html_class( (string) $atts['id'] );
+		$atts['theme']                = 'light' === $atts['theme'] ? 'light' : 'dark';
+		$atts['height']               = $this->safe_css_length( (string) $atts['height'] );
 
 		// Enqueue scripts and styles
 		wp_enqueue_style( 'lumos-deepmind-slider' );
@@ -80,10 +121,12 @@ class Lumos_Slider_Shortcode {
 	public function render_slider_html( $slides, $config ) {
 		$unique_id            = esc_attr( $config['id'] );
 		$caption              = $config['caption'];
-		$loop                 = 'true' === $config['loop'] || true === $config['loop'];
+		$loop                 = 'true' === $config['loop'];
+		$autoplay             = 'true' === $config['autoplay'];
 		$raw_speed            = isset( $config['autoplay_speed'] ) ? floatval( $config['autoplay_speed'] ) : 6000;
 		$autoplay_speed       = ( $raw_speed > 0 && $raw_speed < 100 ) ? intval( $raw_speed * 1000 ) : intval( $raw_speed );
-		$advance_on_video_end = 'false' !== $config['advance_on_video_end'] && false !== $config['advance_on_video_end'];
+		$autoplay_speed       = max( 1000, $autoplay_speed );
+		$advance_on_video_end = 'true' === $config['advance_on_video_end'];
 		$custom_height        = ! empty( $config['height'] ) ? 'style="height:' . esc_attr( $config['height'] ) . ';"' : '';
 		$total_slides         = count( $slides );
 		?>
@@ -99,6 +142,7 @@ class Lumos_Slider_Shortcode {
 							data-autoplay="<?php echo $autoplay ? 'true' : 'false'; ?>"
 							data-autoplay-speed="<?php echo esc_attr( $autoplay_speed ); ?>"
 							data-advance-on-video-end="<?php echo $advance_on_video_end ? 'true' : 'false'; ?>"
+							tabindex="0"
 							role="region">
 
 						<div aria-atomic="true" aria-live="polite" class="sr-only" id="carousel-announcer-<?php echo esc_attr( $unique_id ); ?>">
@@ -280,6 +324,17 @@ class Lumos_Slider_Shortcode {
 			</div>
 		</section>
 		<?php
+	}
+
+	/**
+	 * Accept only a safe CSS length expression for the slide height.
+	 *
+	 * @param string $value Raw value.
+	 * @return string Safe value, or empty string.
+	 */
+	private function safe_css_length( $value ) {
+		$value = trim( $value );
+		return preg_match( '/^[0-9a-z().%\s,+\-*\/]{1,120}$/i', $value ) ? $value : '';
 	}
 
 	/**

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Publish a new version:  scripts/release.sh 1.2.0 "What changed"
-# Bumps the version, commits, tags and pushes. GitHub Actions builds the zip and
+# Bumps the version, commits and pushes to main. The "Release on push" workflow then
+# creates tag v<version>, builds the zip and publishes the release, and
 # WordPress sites show "Update available" (every 6 hours, or Dashboard → Updates → Check again).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -14,6 +15,5 @@ sed -i.bak -E "s/define\( 'LUMOS_SLIDER_VERSION', '[^']+' \)/define( 'LUMOS_SLID
 rm -f "$F.bak"
 git add "$F"
 git commit -m "Release v$V: $NOTES"
-git tag "v$V"
-git push origin main "v$V"
+git push origin main
 echo "Pushed v$V. Build: https://github.com/centralbaku/lumos-deepmind-slider/actions"

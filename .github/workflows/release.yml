@@ -1,12 +1,30 @@
-name: Build & Release
+# Publishes a WordPress update every time a new version reaches main.
+#
+# On each push to main this reads "Version:" from the plugin header. If no release
+# "v<version>" exists yet, it lints the PHP, builds lumos-deepmind-slider-v<version>.zip with a
+# top-level "lumos-deepmind-slider/" folder and publishes the release. Sites running the plugin
+# then see the update (Lumos_GitHub_Updater in includes/lumos-updater.php).
+#
+# To ship an update: bump "Version:" (and the matching *_VERSION constant) and push
+# to main. Pushes that keep the same version publish nothing.
+name: Release on push
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  SLUG: lumos-deepmind-slider
+  PLUGIN_DIR: lumos-deepmind-slider
+  PLUGIN_NAME: "Lumos DeepMind Hero Slider"
 
 jobs:
   release:
@@ -14,29 +32,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
+      - name: Read version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MAIN="$PLUGIN_DIR/$SLUG.php"
+          VERSION=$(grep -m1 -E '^[[:space:]]*\*?[[:space:]]*Version:' "$MAIN" | sed -E 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=$MAIN::Version header '$VERSION' is not X.Y.Z"
+            exit 1
+          fi
+
+          CONST=$(grep -m1 -E "define\([[:space:]]*'[A-Z_]+_VERSION'" "$MAIN" | sed -E "s/.*_VERSION',[[:space:]]*'([^']+)'.*/\1/" || true)
+          if [ -n "$CONST" ] && [ "$CONST" != "$VERSION" ]; then
+            echo "::error file=$MAIN::Version header ($VERSION) and *_VERSION constant ($CONST) differ"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$VERSION is already released. Bump Version in $MAIN to publish an update."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Lint PHP
-        run: find lumos-deepmind-slider -name '*.php' -print0 | xargs -0 -n1 php -l
-
-      - name: Check tag matches plugin version
+        if: steps.version.outputs.exists == 'false'
         run: |
-          F=lumos-deepmind-slider/lumos-deepmind-slider.php
-          TAG="${GITHUB_REF_NAME#v}"
-          HDR=$(grep -m1 -E '^\s*\*\s*Version:' $F | awk '{print $NF}')
-          CONST=$(grep -m1 "define( 'LUMOS_SLIDER_VERSION'" $F | sed -E "s/.*'([^']+)' \).*/\1/")
-          echo "tag=$TAG header=$HDR const=$CONST"
-          [ "$TAG" = "$HDR" ] && [ "$TAG" = "$CONST" ] || { echo "Version mismatch"; exit 1; }
+          php -v | head -1
+          find "$PLUGIN_DIR" -name '*.php' -not -path '*/.git/*' -print0 | xargs -0 -n1 php -l > /dev/null
 
       - name: Build zip
+        if: steps.version.outputs.exists == 'false'
+        id: build
         run: |
-          find lumos-deepmind-slider -name '.DS_Store' -delete
-          zip -qr "lumos-deepmind-slider-${GITHUB_REF_NAME}.zip" lumos-deepmind-slider
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP="$SLUG-v$VERSION.zip"
+          mkdir -p "build/$SLUG"
+          rsync -a "$PLUGIN_DIR/" "build/$SLUG/" \
+            --exclude '.git' --exclude '.github' --exclude '.gitignore' \
+            --exclude 'build' --exclude 'dist' --exclude 'scripts' \
+            --exclude '*.zip' --exclude '.DS_Store' --exclude '*.tmp' --exclude '*.log'
+          (cd build && zip -qr "../$ZIP" "$SLUG")
+          unzip -l "$ZIP" | tail -1
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          name: "Lumos DeepMind Hero Slider ${{ github.ref_name }}"
-          files: lumos-deepmind-slider-${{ github.ref_name }}.zip
-          generate_release_notes: true
+      - name: Publish release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v$VERSION" "${{ steps.build.outputs.zip }}" \
+            --target "$GITHUB_SHA" \
+            --title "$PLUGIN_NAME v$VERSION" \
+            --generate-notes

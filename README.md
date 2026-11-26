@@ -240,5 +240,8 @@ To publish a new version from your Mac: commit your changes, then
 scripts/release.sh 1.2.0 "What changed"
 ```
 
-GitHub Actions lints the PHP, checks the tag matches the plugin version, builds
-`lumos-deepmind-slider-v1.2.0.zip` and attaches it to the release.
+That bumps the version and pushes to `main`. On every push to `main`, GitHub Actions
+(`.github/workflows/release.yml`) checks whether that version has a release yet; if not, it
+lints the PHP, builds `lumos-deepmind-slider-v1.2.0.zip` and publishes release `v1.2.0`.
+Pushes that keep the same version publish nothing. Updates are handled by the shared Lumos
+updater (`includes/lumos-updater.php`), the same in every Lumos plugin.
